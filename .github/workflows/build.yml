@@ -1,0 +1,93 @@
+name: Build zigpal libretro core
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  macos:
+    name: macOS (${{ matrix.arch }})
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: aarch64
+            target: aarch64-macos
+            artifact: arm64
+          - arch: x86_64
+            target: x86_64-macos
+            artifact: x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Zig 0.16.0
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+
+      - name: Build
+        run: |
+          zig build -Dtarget=${{ matrix.target }} -Doptimize=ReleaseFast
+
+      - name: Verify artifact
+        run: |
+          ls -lh zig-out/lib/
+          file zig-out/lib/libzigpal_libretro.dylib
+
+      - name: Stage artifact
+        run: |
+          mkdir -p out
+          cp zig-out/lib/libzigpal_libretro.dylib out/zigpal_libretro-${{ matrix.artifact }}.dylib
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zigpal-macos-${{ matrix.artifact }}
+          path: out/zigpal_libretro-${{ matrix.artifact }}.dylib
+
+  universal:
+    name: macOS universal binary
+    needs: macos
+    runs-on: macos-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: zigpal-macos-*
+          merge-multiple: true
+
+      - name: Lipo
+        run: |
+          lipo -create -output zigpal_libretro.dylib \
+            zigpal_libretro-arm64.dylib zigpal_libretro-x86_64.dylib
+          file zigpal_libretro.dylib
+          lipo -info zigpal_libretro.dylib
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zigpal-macos-universal
+          path: zigpal_libretro.dylib
+
+  release:
+    name: Publish release
+    needs: universal
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Stage release files
+        run: |
+          mkdir release
+          cp zigpal-macos-arm64/zigpal_libretro-arm64.dylib release/zigpal_libretro-macos-arm64.dylib
+          cp zigpal-macos-x86_64/zigpal_libretro-x86_64.dylib release/zigpal_libretro-macos-x86_64.dylib
+          cp zigpal-macos-universal/zigpal_libretro.dylib release/zigpal_libretro-macos-universal.dylib
+          ls -lh release/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true

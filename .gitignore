@@ -1,0 +1,39 @@
+# Zig build outputs
+.zig-cache/
+zig-out/
+zig-pkg/
+
+# Test scratch
+test_widen
+*.o
+*.dylib
+*.so
+*.dll
+libui_check.a
+
+# Generated images / debug dumps
+output.png
+map_output.png
+palette_output.png
+scene_output.png
+
+# Vendored SDLPAL upstream (used as reference; not part of build).
+# Other developers can clone https://github.com/sdlpal/sdlpal into this path
+# if they want to consult the original C source.
+resources/sdlpal-master/
+
+# Player-supplied game data files (proprietary, never committed).
+resources/pal/
+
+# zpix font — open-source but distributed upstream; users download separately.
+resources/zpix.bdf
+
+# macOS / IDE / editor artifacts
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Claude Code session state — these are per-machine; keep out of public repos.
+.claude/
