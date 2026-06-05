@@ -131,7 +131,6 @@ fn tryInit() void {
         std.log.err("audio: pal_rix_player_create failed (mus.mkf {d} bytes)", .{mus_bytes.len});
         return;
     }
-    std.log.info("audio: rix player up; mus.mkf {d} bytes", .{mus_bytes.len});
 }
 
 pub fn deinit() void {
@@ -160,14 +159,6 @@ pub fn deinit() void {
 /// (battle entry); we want the playMusic to win, which is what happens if
 /// the libretro thread hasn't picked up the stopMusic yet.
 pub fn playMusic(num: i32, loop: bool, fade_seconds: f32) void {
-    std.log.info("audio: playMusic num={d} loop={} fade={d:.1}s cur={d} active={} fade_state=.{s}", .{
-        num,
-        loop,
-        fade_seconds,
-        g_music.num,
-        g_music.active,
-        @tagName(g_music.fade),
-    });
     g_pending = .{
         .set = true,
         .num = num,
@@ -186,7 +177,6 @@ pub fn stopMusic(fade_seconds: f32) void {
 pub fn playSound(num: i32) void {
     if (num == 0) return;
     const sfx = if (num < 0) -num else num;
-    std.log.info("audio: playSound num={d}", .{sfx});
     const idx = g_sfx_tail % SFX_QUEUE;
     g_sfx_queue[idx] = .{ .num = sfx };
     g_sfx_tail +%= 1;
@@ -205,10 +195,7 @@ fn drainSfxQueue() void {
 
 fn startVoice(sfx_num: i32) void {
     // Mirror SDLPAL's lastSFX dedupe (sound.c:769).
-    if (g_last_sfx == sfx_num) {
-        std.log.info("audio: SFX {d} dedup (lastSFX)", .{sfx_num});
-        return;
-    }
+    if (g_last_sfx == sfx_num) return;
 
     const voc_buf = global.res_buffers.voc orelse {
         std.log.err("audio: SFX {d} — voc.mkf not loaded", .{sfx_num});
@@ -223,11 +210,6 @@ fn startVoice(sfx_num: i32) void {
         std.log.err("audio: SFX {d} — VOC parse failed (chunk {d} bytes)", .{ sfx_num, chunk.len });
         return;
     };
-    std.log.info("audio: SFX {d} starting (rate={d} samples={d})", .{
-        sfx_num,
-        parsed.rate,
-        parsed.samples.len,
-    });
 
     // Find an idle voice; if none, recycle the oldest by index. SDLPAL keeps
     // an unbounded linked list — at 8 voices we never hit it in practice.
