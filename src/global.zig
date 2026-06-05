@@ -425,6 +425,9 @@ pub const Files = struct {
     gop: ?MkfFile = null,
     pat: ?MkfFile = null,
     rng: ?MkfFile = null,
+    // mus.mkf is the RIX music bank fed into pal-adplug; the audio module
+    // keeps a long-lived view of res_buffers.mus so we don't expose MkfFile
+    // here — the bytes go directly to pal_rix_create.
 };
 
 // LPGAMEDATA — game data loaded from data files.
@@ -525,6 +528,8 @@ pub const ResourceBuffers = struct {
     fon: ?[]u8 = null,
     desc: ?[]u8 = null,
     rng: ?[]u8 = null,
+    mus: ?[]u8 = null,
+    voc: ?[]u8 = null,
 };
 
 pub var res_buffers: ResourceBuffers = .{};

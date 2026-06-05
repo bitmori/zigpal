@@ -113,6 +113,8 @@ fn loadAllResourceFiles(base_dir: []const u8) !void {
         .{ .name = "MAP.MKF", .dst = &global.res_buffers.map, .mkf = &global.gpg.f.map },
         .{ .name = "GOP.MKF", .dst = &global.res_buffers.gop, .mkf = &global.gpg.f.gop },
         .{ .name = "RNG.MKF", .dst = &global.res_buffers.rng, .mkf = &global.gpg.f.rng },
+        .{ .name = "MUS.MKF", .dst = &global.res_buffers.mus, .mkf = null },
+        .{ .name = "VOC.MKF", .dst = &global.res_buffers.voc, .mkf = null },
         .{ .name = "WORD.DAT", .dst = &global.res_buffers.word, .mkf = null },
         .{ .name = "M.MSG", .dst = &global.res_buffers.msg, .mkf = null },
         .{ .name = "WOR16.ASC", .dst = &global.res_buffers.asc, .mkf = null },

@@ -801,8 +801,12 @@ pub fn startBattle(enemy_team: u16, is_boss: bool) BattleResult {
 
     initBattle(enemy_team, is_boss);
 
-    // Music skipped (no audio).
+    // Battle music — fade out current BGM, then start the battle track.
+    // Mirrors SDLPAL battle.c:717,728. wNumBattleMusic is set by script
+    // op 0x0045 before battle is triggered.
+    @import("audio.zig").stopMusic(1.0);
     util.delay(200);
+    @import("audio.zig").playMusic(@intCast(global.gpg.num_battle_music), true, 0);
 
     if (global.gpg.need_to_fade_in) {
         palette.fadeIn(@intCast(global.gpg.num_palette), global.gpg.night_palette, 1);
@@ -834,6 +838,9 @@ pub fn startBattle(enemy_team: u16, is_boss: bool) BattleResult {
     // Restore screen wave.
     global.gpg.wave_progression = prev_wave_progression;
     global.gpg.screen_wave = prev_wave_level;
+
+    // Restore field BGM (SDLPAL battle.c:1849).
+    @import("audio.zig").playMusic(@intCast(global.gpg.num_music), true, 1.0);
 
     return result;
 }

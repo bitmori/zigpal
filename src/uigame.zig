@@ -272,10 +272,16 @@ pub fn systemMenu() bool {
                 global.reloadInNextTick(@intCast(slot));
             }
         },
-        // Music — no-op (no audio).
-        3 => _ = switchMenu(false),
-        // Sound — no-op (no audio).
-        4 => _ = switchMenu(false),
+        // Music toggle — uigame.c L597-622.
+        3 => {
+            const audio = @import("audio.zig");
+            audio.setMusicEnabled(switchMenu(audio.musicEnabled()));
+        },
+        // Sound effect toggle.
+        4 => {
+            const audio = @import("audio.zig");
+            audio.setSoundEnabled(switchMenu(audio.soundEnabled()));
+        },
         // Quit.
         5 => quitGame(),
         else => {},

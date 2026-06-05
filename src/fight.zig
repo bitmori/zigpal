@@ -369,6 +369,8 @@ pub fn postActionCheck(fCheckPlayers: bool) void {
         const e = &battle.g_battle.enemies[i];
         if (e.object_id == 0) continue;
         if (@as(i16, @bitCast(e.e.health)) <= 0) {
+            // fight.c L756 — enemy death sound.
+            @import("audio.zig").playSound(@intCast(e.e.death_sound));
             // Debug mode: 10× exp/cash for grinding speed during testing.
             const mul: i32 = if (@import("debug.zig").enabled) 10 else 1;
             battle.g_battle.exp_gained += @as(i32, e.e.exp) * mul;
@@ -475,6 +477,8 @@ pub fn postActionCheck(fCheckPlayers: bool) void {
 
                     const sDying = global.gpg.g.objects[wName].player().script_on_dying;
                     if (sDying != 0) {
+                        // fight.c L850 — dying voice cue.
+                        @import("audio.zig").playSound(@intCast(global.gpg.g.player_roles.dying_sound[w]));
                         battleDelay(10, 0, true);
 
                         battle.battleMakeScene();
@@ -784,9 +788,17 @@ fn validateAction(player_index: u16) void {
 // effect sprite from FIRE/DATA effect_sprite indexed via rgwBattleEffectIndex,
 // flash + back-and-forth bounce on targets.
 fn playerAttackAnim(player_index: u16, target: i32, critical: bool) void {
-    _ = critical; // audio gating only — no sound system
     const role = global.gpg.party[player_index].player_role;
     const p = &battle.g_battle.players[player_index];
+
+    // fight.c L2061 — attack/critical voice while alive.
+    if (global.gpg.g.player_roles.hp[role] > 0) {
+        const sfx: u16 = if (critical)
+            global.gpg.g.player_roles.critical_sound[role]
+        else
+            global.gpg.g.player_roles.attack_sound[role];
+        @import("audio.zig").playSound(@intCast(sfx));
+    }
 
     var enemy_x: i32 = 0;
     var enemy_y: i32 = 0;
@@ -852,6 +864,9 @@ fn playerAttackAnim(player_index: u16, target: i32, critical: bool) void {
     y -= 4;
     _ = &x;
     _ = &y;
+
+    // fight.c L2124 — weapon impact SFX.
+    @import("audio.zig").playSound(@intCast(global.gpg.g.player_roles.weapon_sound[role]));
 
     // Effect frames: 3 ticks of sprite over the target(s) + idle gestures.
     x = enemy_x;
@@ -2053,7 +2068,7 @@ fn enemyPerformMagicAction(enemy_index: u32, wMagic: u16, sTargetPtr: *i32, wPla
 
 // PAL_BattlePlayerEscape — slide all alive players off-screen.
 pub fn playerEscape() void {
-    // battle.c L1438. AUDIO_PlaySound(45) skipped (no audio in this port).
+    @import("audio.zig").playSound(45);
     updateFighters();
 
     var i: u32 = 0;
@@ -2170,6 +2185,8 @@ pub fn battleShowPlayerOffMagicAnim(player_index: u16, object_id: u16, sTarget: 
     while (i < l) : (i += 1) {
         if (i == fire_delay and player_index != 0xFFFF) {
             battle.g_battle.players[player_index].current_frame = 6;
+            // fight.c L2501 — magic sound at the fire-delay frame.
+            @import("audio.zig").playSound(@as(i32, global.gpg.g.magics[iMagicNum].sound));
         }
 
         // Random "blow" jitter applied to all enemy positions.

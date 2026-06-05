@@ -1361,8 +1361,9 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
             g_script_success = false;
         },
         0x0043 => {
-            // Set background music — no audio.
+            // Set background music.
             global.gpg.num_music = p_script.operand[0];
+            @import("audio.zig").playMusic(p_script.operand[0], true, 1.0);
         },
         0x0044 => {
             partyRideEventObject(event_object_id, p_script.operand[0], p_script.operand[1], p_script.operand[2], 4);
@@ -1396,7 +1397,7 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
             }
         },
         0x0047 => {
-            // PAL_PlaySound — no audio.
+            @import("audio.zig").playSound(p_script.operand[0]);
         },
         0x0049 => {
             if (p_script.operand[0] != 0) if (p_current) |pc| { pc.state = @bitCast(p_script.operand[1]); };
@@ -1603,6 +1604,7 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
         },
         0x0077 => {
             global.gpg.num_music = 0;
+            @import("audio.zig").stopMusic(2.0);
         },
         0x0078 => {
             // unknown.
@@ -2141,6 +2143,7 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
         },
         0x00A3 => {
             global.gpg.num_music = p_script.operand[1];
+            @import("audio.zig").playMusic(p_script.operand[1], true, 1.0);
         },
         0x00A4 => {
             // PAL_ScrollFBP. SDLPAL HACKHACK: chunk 68 is preceded by ShowFBP(69).

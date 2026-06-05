@@ -12,6 +12,7 @@ const std = @import("std");
 const video = @import("video.zig");
 const input = @import("input.zig");
 const util = @import("util.zig");
+const audio = @import("audio.zig");
 
 const c = @cImport({
     @cInclude("libretro.h");
@@ -123,6 +124,8 @@ export fn retro_run() void {
     if (video_cb) |cb| {
         cb(&video.framebuffer, SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_WIDTH * 2);
     }
+
+    audio.produce(audio_batch_cb);
 }
 
 fn pumpJoypadInput() void {
@@ -208,6 +211,10 @@ export fn retro_load_game(info: ?*const c.retro_game_info) bool {
     quit_flag.store(false, .monotonic);
     loaded = true;
 
+    // Audio init must happen after the game thread loads MUS.MKF, but the
+    // game thread runs asynchronously — instead we let init() be lazy and
+    // pick up res_buffers.mus the first time it's called. The first
+    // playMusic() from script will trigger init via produce()'s null check.
     // Spawn the game thread. The thread runs PAL_GameMain (in main.zig),
     // which loops indefinitely on virtual ticks.
     game_thread = std.Thread.spawn(.{}, gameThreadEntry, .{}) catch return false;
@@ -232,6 +239,7 @@ export fn retro_unload_game() void {
         t.join();
         game_thread = null;
     }
+    audio.deinit();
     loaded = false;
 }
 

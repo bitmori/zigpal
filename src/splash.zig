@@ -89,6 +89,10 @@ pub fn trademarkScreen() void {
 pub fn splashScreen() void {
     if (noSplashFlagSet()) return;
 
+    // PAL_SplashScreen plays the title RIX (track 5) on entry — matches
+    // SDLPAL's main.c:293. Do this first so init delay overlaps the load.
+    @import("audio.zig").playMusic(5, true, 2.0);
+
     const fbp = global.gpg.f.fbp orelse return;
     const mgo = global.gpg.f.mgo orelse return;
     const base_pal = palette.get(1, false) orelse return;
