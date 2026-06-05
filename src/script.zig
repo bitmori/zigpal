@@ -2158,6 +2158,9 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
         0x00A6 => {
             video.backupScreen();
         },
+        0x00A7 => {
+            // SDLPAL just advances the script pointer — explicit no-op.
+        },
         else => {
             // Unhandled — log once per opcode value so we can spot missing
             // implementations driving real game scripts.
@@ -2199,6 +2202,12 @@ fn writeLog(fd: c_io.fd_t, comptime fmt: []const u8, args: anytype) void {
 }
 
 fn logUnhandled(op: u16) void {
+    // Strict mode: ZIGPAL_STRICT_OPCODES=1 turns the silent log into a panic
+    // so a missing opcode shows up as a hard failure during a coverage run.
+    if (strictOpcodes()) {
+        std.debug.panic("zigpal: unhandled script opcode 0x{X:0>4}", .{op});
+    }
+
     const byte = op / 8;
     const bit: u3 = @intCast(op & 7);
     if ((unhandled_logged[byte] & (@as(u8, 1) << bit)) != 0) return;
@@ -2209,6 +2218,22 @@ fn logUnhandled(op: u16) void {
         unhandled_fd = openLogFile("zigpal_unhandled_ops.log");
     }
     writeLog(unhandled_fd, "unhandled opcode 0x{X}\n", .{op});
+}
+
+var strict_opcodes_cached: ?bool = null;
+
+extern "c" fn getenv(name: [*:0]const u8) ?[*:0]const u8;
+
+fn strictOpcodes() bool {
+    if (strict_opcodes_cached) |v| return v;
+    const ptr = getenv("ZIGPAL_STRICT_OPCODES");
+    var on = false;
+    if (ptr) |raw| {
+        const s = std.mem.span(raw);
+        on = s.len > 0 and s[0] != '0';
+    }
+    strict_opcodes_cached = on;
+    return on;
 }
 
 // AutoScript execution trace — written to system/pal/zigpal_autoscript.log so
