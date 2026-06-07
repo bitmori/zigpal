@@ -416,6 +416,15 @@ pub fn update() void {
     input.clearKeyState();
 }
 
+// True if `idx` points at an alive enemy slot. Used to decide whether the
+// "remember last target" path can reuse a stored index.
+fn isEnemyTargetable(idx: i32) bool {
+    if (idx < 0) return false;
+    if (battle.g_battle.max_enemy_index < 0) return false;
+    if (idx > battle.g_battle.max_enemy_index) return false;
+    return battle.g_battle.enemies[@intCast(idx)].object_id != 0;
+}
+
 fn handleMainMenuKeys(role: u16) void {
     const k = input.state.key_press;
     if ((k & input.KEY_SEARCH) != 0) {
@@ -425,11 +434,16 @@ fn handleMainMenuKeys(role: u16) void {
                 if (global.playerCanAttackAll(role)) {
                     battle.g_battle.ui.state = .select_target_enemy_all;
                 } else {
-                    if (battle.g_battle.ui.prev_enemy_target != -1) {
-                        battle.g_battle.ui.selected_index = battle.g_battle.ui.prev_enemy_target;
-                    }
+                    // Default to last picked target if it's still alive,
+                    // else fall back to slot 0. (Earlier code reset to 0
+                    // unconditionally after restoring, which was a bug.)
+                    battle.g_battle.ui.selected_index =
+                        if (battle.g_battle.ui.prev_enemy_target != -1 and
+                            isEnemyTargetable(@intCast(battle.g_battle.ui.prev_enemy_target)))
+                            battle.g_battle.ui.prev_enemy_target
+                        else
+                            0;
                     battle.g_battle.ui.state = .select_target_enemy;
-                    battle.g_battle.ui.selected_index = 0;
                 }
             },
             1 => { // Magic
@@ -445,11 +459,13 @@ fn handleMainMenuKeys(role: u16) void {
                     if ((flags & global.MAGIC_FLAG_APPLY_TO_ALL) != 0) {
                         battle.g_battle.ui.state = .select_target_enemy_all;
                     } else {
-                        if (battle.g_battle.ui.prev_enemy_target != -1) {
-                            battle.g_battle.ui.selected_index = battle.g_battle.ui.prev_enemy_target;
-                        }
+                        battle.g_battle.ui.selected_index =
+                            if (battle.g_battle.ui.prev_enemy_target != -1 and
+                                isEnemyTargetable(@intCast(battle.g_battle.ui.prev_enemy_target)))
+                                battle.g_battle.ui.prev_enemy_target
+                            else
+                                0;
                         battle.g_battle.ui.state = .select_target_enemy;
-                        battle.g_battle.ui.selected_index = 0;
                     }
                 } else {
                     if ((flags & global.MAGIC_FLAG_APPLY_TO_ALL) != 0) {

@@ -83,7 +83,12 @@ const menu_entries = [_]MenuEntry{
     .{ .label = "\xb6\x69\xc4\x5f", .action = actionGetItem }, // 進寶
     .{ .label = "\xab\x4c\xbc\x76", .action = actionPartyEdit }, // 俠影
     .{ .label = "\xb7\xd2\xbe\xd4", .action = actionStartBattle }, // 煉戰 (魄 not in wor16 font)
+    .{ .label = "\xa5\x7e\xa8\xe5", .action = actionHack }, // 外典 — JSON-driven cheats
 };
+
+fn actionHack() void {
+    @import("hack.zig").runMenu();
+}
 
 fn actionStartBattle() void {
     const team = pickEnemyTeam() orelse return;

@@ -1729,6 +1729,9 @@ pub fn enemyPerformAction(enemy_index: u32) void {
         fAutoDefend = false;
     }
 
+    // fight.c L4934 — enemy attack voice (cue precedes the windup frames).
+    @import("audio.zig").playSound(@as(i32, e.e.attack_sound));
+
     // Idle/magic frames before the attack (L4987-L4992).
     {
         var ii: u32 = 0;
@@ -1747,18 +1750,27 @@ pub fn enemyPerformAction(enemy_index: u32) void {
             battleDelay(1, 0, false);
         }
     }
+    // fight.c L5003 — charge / footstep cue.
+    @import("audio.zig").playSound(@as(i32, e.e.action_sound));
     battleDelay(1, 0, false);
 
     const ex: i32 = global.palX(battle.g_battle.players[@intCast(sTarget)].pos) - 44;
     const ey: i32 = global.palY(battle.g_battle.players[@intCast(sTarget)].pos) - 16;
 
+    // fight.c L5010: hit/cover sound is decided up front; falls back to the
+    // enemy's wCallSound, overridden by the cover/defending player's
+    // rgwCoverSound when applicable.
+    var iSound: i32 = @as(i32, e.e.call_sound);
     if (iCoverIndex != -1) {
+        const cover_role = global.gpg.party[@intCast(iCoverIndex)].player_role;
+        iSound = @as(i32, global.gpg.g.player_roles.cover_sound[cover_role]);
         battle.g_battle.players[@intCast(iCoverIndex)].current_frame = 3;
         const cx: i32 = global.palX(battle.g_battle.players[@intCast(sTarget)].pos) - 24;
         const cy: i32 = global.palY(battle.g_battle.players[@intCast(sTarget)].pos) - 12;
         battle.g_battle.players[@intCast(iCoverIndex)].pos = global.palXY(@truncate(cx), @truncate(cy));
     } else if (fAutoDefend) {
         battle.g_battle.players[@intCast(sTarget)].current_frame = 3;
+        iSound = @as(i32, global.gpg.g.player_roles.cover_sound[wPlayerRole]);
     }
 
     // Attack frames at ex/ey (L5029-L5050).
@@ -1804,6 +1816,8 @@ pub fn enemyPerformAction(enemy_index: u32) void {
             battle.g_battle.players[@intCast(sTarget)].color_shift = 6;
         }
     }
+    // fight.c L5084 — hit/cover/dodge sound (the iSound chosen up at L5010).
+    @import("audio.zig").playSound(iSound);
     battleDelay(1, 0, false);
     if (iCoverIndex != -1) battle.g_battle.players[@intCast(iCoverIndex)].color_shift = 0;
     battle.g_battle.players[@intCast(sTarget)].color_shift = 0;
@@ -1828,6 +1842,8 @@ pub fn enemyPerformAction(enemy_index: u32) void {
     // checks wPlayerRole, not the cover).
     var wPostFrame: u16 = wFrameBak;
     if (global.gpg.g.player_roles.hp[wPlayerRole] == 0) {
+        // fight.c L5110 — death cry on KO.
+        @import("audio.zig").playSound(@as(i32, global.gpg.g.player_roles.death_sound[wPlayerRole]));
         wPostFrame = 2;
     } else if (isPlayerDying(wPlayerRole)) {
         wPostFrame = 1;
@@ -1905,6 +1921,9 @@ fn enemyPerformMagicAction(enemy_index: u32, wMagic: u16, sTargetPtr: *i32, wPla
         e.pos = global.palXY(@truncate(ex), @truncate(ey));
         battleDelay(1, 0, false);
     }
+
+    // fight.c L4695 — incantation cue right before the casting frames.
+    @import("audio.zig").playSound(@as(i32, e.e.magic_sound));
 
     // Casting frames (L4697-L4707).
     {
@@ -2361,6 +2380,12 @@ pub fn battleShowEnemyMagicAnim(enemy_index: u16, object_id: u16, sTarget: i32) 
             }
             battle.g_battle.magic_bitmap = palcommon.spriteGetFrame(lpSpriteEffect, fk);
 
+            // fight.c L2713 — re-trigger the magic SFX every time the effect
+            // loop wraps back to fire_delay (the cue plays once per repeat).
+            if (n != fire_delay and @mod(i - fire_delay, n) == 0) {
+                @import("audio.zig").playSound(@as(i32, global.gpg.g.magics[iMagicNum].sound));
+            }
+
             // While the casting frames play, switch the enemy gesture to its
             // attack pose (idle_frames + magic_frames + offset).
             if (fire_delay > 0 and i >= fire_delay and
@@ -2466,6 +2491,11 @@ pub fn battleShowPlayerDefMagicAnim(player_index: u16, object_id: u16, sTarget: 
     while (i < n) : (i += 1) {
         battle.g_battle.magic_bitmap = palcommon.spriteGetFrame(lpSpriteEffect, i);
 
+        // fight.c L2501 — play the magic cue once at fire_delay frame.
+        if (i == @as(i32, global.gpg.g.magics[iMagicNum].fire_delay)) {
+            @import("audio.zig").playSound(@as(i32, global.gpg.g.magics[iMagicNum].sound));
+        }
+
         while (util.getTicks() < dw_time) {
             input.processEvent();
             std.Thread.yield() catch {};
@@ -2543,6 +2573,13 @@ pub fn battleShowPlayerPreMagicAnim(player_index: u16, fSummon: bool) void {
     }
     battleDelay(2, 0, true);
     battle.g_battle.players[player_index].current_frame = 5;
+
+    // fight.c L2377 — incantation cue. The role's per-character magic_sound,
+    // played as soon as the casting frame appears.
+    {
+        const role_for_voice = global.gpg.party[player_index].player_role;
+        @import("audio.zig").playSound(@as(i32, global.gpg.g.player_roles.magic_sound[role_for_voice]));
+    }
 
     if (!fSummon) {
         const role = global.gpg.party[player_index].player_role;
