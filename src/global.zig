@@ -28,6 +28,19 @@ pub const MAX_EVENT_OBJECTS = palcommon.MAX_EVENT_OBJECTS;
 pub const MAX_POISONS = palcommon.MAX_POISONS;
 pub const MAX_LEVELS = palcommon.MAX_LEVELS;
 
+// 魔改 — extended limits, mirroring SDLPAL fork's palcommon.h.
+// Stat cap raised from the vanilla 999 to allow late-game character
+// builds that would otherwise be clamped (level-up, equipment, magic
+// boosts all clip here).
+pub const MAX_PROPERTY_VALUE: u16 = 9999;
+// Poisons with level >= this bypass resistance rolls (sure-hit).
+pub const EX_POISON_CAN_PIERCE_LEVEL: u16 = 10;
+// Highest poison level that survives revive / cure-by-level after death.
+pub const EX_POISON_PERSIST_AFTER_REVIVE: u16 = 97;
+// Highest poison level that the status panel will list. Vanilla was 3;
+// raising this surfaces the new "permanent" poisons (寿虫蠱 etc.).
+pub const EX_MAX_VISIBLE_POISON_LEVEL: u16 = 98;
+
 // FRAME_TIME (game.h: FPS=10)
 pub const FPS: u32 = 10;
 pub const FRAME_TIME: u32 = 1000 / FPS;
@@ -769,13 +782,13 @@ pub fn playerLevelUp(role: u16, n_levels: u32) void {
         gpg.g.player_roles.dexterity[role] +%= @intCast(2 + util.randomLong(0, 1));
         gpg.g.player_roles.flee_rate[role] +%= 2;
     }
-    if (gpg.g.player_roles.max_hp[role] > 999) gpg.g.player_roles.max_hp[role] = 999;
-    if (gpg.g.player_roles.max_mp[role] > 999) gpg.g.player_roles.max_mp[role] = 999;
-    if (gpg.g.player_roles.attack_strength[role] > 999) gpg.g.player_roles.attack_strength[role] = 999;
-    if (gpg.g.player_roles.magic_strength[role] > 999) gpg.g.player_roles.magic_strength[role] = 999;
-    if (gpg.g.player_roles.defense[role] > 999) gpg.g.player_roles.defense[role] = 999;
-    if (gpg.g.player_roles.dexterity[role] > 999) gpg.g.player_roles.dexterity[role] = 999;
-    if (gpg.g.player_roles.flee_rate[role] > 999) gpg.g.player_roles.flee_rate[role] = 999;
+    if (gpg.g.player_roles.max_hp[role] > MAX_PROPERTY_VALUE) gpg.g.player_roles.max_hp[role] = MAX_PROPERTY_VALUE;
+    if (gpg.g.player_roles.max_mp[role] > MAX_PROPERTY_VALUE) gpg.g.player_roles.max_mp[role] = MAX_PROPERTY_VALUE;
+    if (gpg.g.player_roles.attack_strength[role] > MAX_PROPERTY_VALUE) gpg.g.player_roles.attack_strength[role] = MAX_PROPERTY_VALUE;
+    if (gpg.g.player_roles.magic_strength[role] > MAX_PROPERTY_VALUE) gpg.g.player_roles.magic_strength[role] = MAX_PROPERTY_VALUE;
+    if (gpg.g.player_roles.defense[role] > MAX_PROPERTY_VALUE) gpg.g.player_roles.defense[role] = MAX_PROPERTY_VALUE;
+    if (gpg.g.player_roles.dexterity[role] > MAX_PROPERTY_VALUE) gpg.g.player_roles.dexterity[role] = MAX_PROPERTY_VALUE;
+    if (gpg.g.player_roles.flee_rate[role] > MAX_PROPERTY_VALUE) gpg.g.player_roles.flee_rate[role] = MAX_PROPERTY_VALUE;
     gpg.exp.primary[role].exp = 0;
     gpg.exp.primary[role].level = gpg.g.player_roles.level[role];
 }
@@ -808,15 +821,20 @@ fn partySlotOf(role: u16) ?u32 {
     return null;
 }
 
-// PAL_AddPoisonForPlayer — global.c L1459.
+// PAL_AddPoisonForPlayer — global.c L1459 (魔改 two-pass version).
+// Vanilla bailed out of one loop on either dedup match OR empty slot,
+// which meant a free slot before an existing duplicate would re-add the
+// poison. Pass 1 walks every slot to dedup; pass 2 finds the empty slot.
 pub fn addPoisonForPlayer(role: u16, poison_id: u16) void {
     const idx = partySlotOf(role) orelse return;
 
     var i: u32 = 0;
     while (i < MAX_POISONS) : (i += 1) {
-        const w = gpg.poison_status[i][idx].poison_id;
-        if (w == 0) break;
-        if (w == poison_id) return; // already poisoned
+        if (gpg.poison_status[i][idx].poison_id == poison_id) return;
+    }
+    i = 0;
+    while (i < MAX_POISONS) : (i += 1) {
+        if (gpg.poison_status[i][idx].poison_id == 0) break;
     }
     if (i < MAX_POISONS) {
         gpg.poison_status[i][idx].poison_id = poison_id;
@@ -902,6 +920,19 @@ pub fn setPlayerStatus(role: u16, status_id: u16, num_round: u16) bool {
             }
         },
         else => unreachable,
+    }
+    return success;
+}
+
+// PAL_SetPlayerStatusAll — apply a status to every active party member.
+// Used by 魔改 opcode 0x002D when operand[2] is set, so a single script
+// instruction can grant party-wide haste / bravery etc.
+pub fn setPlayerStatusAll(status_id: u16, num_round: u16) bool {
+    var success = true;
+    var i: u32 = 0;
+    while (i <= gpg.max_party_member_index) : (i += 1) {
+        const w = gpg.party[i].player_role;
+        if (!setPlayerStatus(w, status_id, num_round)) success = false;
     }
     return success;
 }

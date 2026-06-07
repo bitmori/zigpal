@@ -42,10 +42,11 @@ pub fn playerInfoBox(pos: palcommon.Pos, player_role: u16) void {
         var pi: u32 = 0;
         while (pi < global.MAX_POISONS) : (pi += 1) {
             const pid = global.gpg.poison_status[pi][@intCast(party_index)].poison_id;
-            if (pid != 0 and global.gpg.g.objects[pid].poison().poison_level <= 3) {
-                if (global.gpg.g.objects[pid].poison().poison_level >= max_level) {
-                    max_level = global.gpg.g.objects[pid].poison().poison_level;
-                    poison_color = @truncate(global.gpg.g.objects[pid].poison().color);
+            const p = global.gpg.g.objects[pid].poison();
+            if (pid != 0 and p.poison_level <= global.EX_MAX_VISIBLE_POISON_LEVEL and p.color != 0) {
+                if (p.poison_level >= max_level) {
+                    max_level = p.poison_level;
+                    poison_color = @truncate(p.color);
                 }
             }
         }

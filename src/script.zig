@@ -969,7 +969,8 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
             }
         },
         0x0022 => {
-            // Revive player.
+            // Revive player. Restore HP, then strip low-level poisons and
+            // every clearable status — matches SDLPAL script.c L1059.
             if (p_script.operand[0] != 0) {
                 g_script_success = false;
                 var i: usize = 0;
@@ -978,6 +979,9 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
                     if (global.gpg.g.player_roles.hp[w] == 0) {
                         global.gpg.g.player_roles.hp[w] =
                             @intCast((@as(u32, global.gpg.g.player_roles.max_hp[w]) * p_script.operand[1]) / 10);
+                        global.curePoisonByLevel(w, global.EX_POISON_PERSIST_AFTER_REVIVE);
+                        var s: u16 = 0;
+                        while (s < global.STATUS_ALL) : (s += 1) global.removePlayerStatus(w, s);
                         g_script_success = true;
                     }
                 }
@@ -985,6 +989,9 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
                 if (global.gpg.g.player_roles.hp[event_object_id] == 0) {
                     global.gpg.g.player_roles.hp[event_object_id] =
                         @intCast((@as(u32, global.gpg.g.player_roles.max_hp[event_object_id]) * p_script.operand[1]) / 10);
+                    global.curePoisonByLevel(event_object_id, global.EX_POISON_PERSIST_AFTER_REVIVE);
+                    var s: u16 = 0;
+                    while (s < global.STATUS_ALL) : (s += 1) global.removePlayerStatus(event_object_id, s);
                 } else g_script_success = false;
             }
         },
@@ -1063,18 +1070,20 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
             }
         },
         0x0029 => {
-            // Apply poison to player.
+            // Apply poison to player. Poisons whose level >= the pierce
+            // threshold ignore resistance and always land (魔改 sure-hit).
             const poison_id = p_script.operand[1];
+            const sure_hit = global.gpg.g.objects[poison_id].poison().poison_level >= global.EX_POISON_CAN_PIERCE_LEVEL;
             if (p_script.operand[0] != 0) {
                 var i: u32 = 0;
                 while (i <= global.gpg.max_party_member_index) : (i += 1) {
                     const w = global.gpg.party[i].player_role;
-                    if (util.randomLong(1, 100) > @as(i32, global.getPlayerPoisonResistance(w))) {
+                    if (sure_hit or util.randomLong(1, 100) > @as(i32, global.getPlayerPoisonResistance(w))) {
                         global.addPoisonForPlayer(w, poison_id);
                     }
                 }
             } else {
-                if (util.randomLong(1, 100) > @as(i32, global.getPlayerPoisonResistance(event_object_id))) {
+                if (sure_hit or util.randomLong(1, 100) > @as(i32, global.getPlayerPoisonResistance(event_object_id))) {
                     global.addPoisonForPlayer(event_object_id, poison_id);
                 }
             }
@@ -1132,8 +1141,12 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
             }
         },
         0x002D => {
-            // Set status for player.
-            if (!global.setPlayerStatus(event_object_id, p_script.operand[0], p_script.operand[1])) {
+            // Set status for player. operand[2] != 0 → apply to whole party.
+            if (p_script.operand[2] != 0) {
+                if (!global.setPlayerStatusAll(p_script.operand[0], p_script.operand[1])) {
+                    g_script_success = false;
+                }
+            } else if (!global.setPlayerStatus(event_object_id, p_script.operand[0], p_script.operand[1])) {
                 g_script_success = false;
             }
         },

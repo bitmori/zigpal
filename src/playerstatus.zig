@@ -188,7 +188,7 @@ pub fn playerStatus() void {
         var pj: u32 = 0;
         while (pi < global.MAX_POISONS) : (pi += 1) {
             const w = global.gpg.poison_status[pi][@intCast(current)].poison_id;
-            if (w != 0 and global.gpg.g.objects[w].poison().poison_level <= 3) {
+            if (w != 0 and global.gpg.g.objects[w].poison().poison_level <= global.EX_MAX_VISIBLE_POISON_LEVEL) {
                 const color: u8 = @intCast((global.gpg.g.objects[w].poison().color + 10) & 0xFF);
                 text.drawText(
                     text.getWord(w),

@@ -829,7 +829,7 @@ pub fn startBattle(enemy_team: u16, is_boss: bool) BattleResult {
     global.clearAllPlayerStatus();
     var w: u32 = 0;
     while (w < global.MAX_PLAYER_ROLES) : (w += 1) {
-        global.curePoisonByLevel(@intCast(w), 3);
+        global.curePoisonByLevel(@intCast(w), global.EX_MAX_VISIBLE_POISON_LEVEL);
         global.removeEquipmentEffect(@intCast(w), global.BODYPART_EXTRA);
     }
 
