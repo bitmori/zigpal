@@ -74,6 +74,12 @@ fn isActionValid(action: u16) bool {
     }
 }
 
+// 魔改 — 6th misc item (情報) opens enemyinfo.zig. The label has no
+// WORD.DAT entry, so we feed text.drawText the BIG5 bytes directly to
+// match the chrome of the other rows. (情=B1A1, 報=B3F8.)
+const BATTLEUI_MISC_ITEMS: i32 = 6;
+const MISC_LABEL_INFO_BIG5 = "\xB1\xA1\xB3\xF8";
+
 // PAL_BattleUIDrawMiscMenu (PAL_CLASSIC).
 fn drawMiscMenu(current: u16, confirmed: bool) void {
     const items = [_]ui.MenuItem{
@@ -83,7 +89,7 @@ fn drawMiscMenu(current: u16, confirmed: bool) void {
         .{ .value = 3, .num_word = BATTLEUI_LABEL_FLEE, .enabled = true, .pos = global.palXY(16, 86) },
         .{ .value = 4, .num_word = BATTLEUI_LABEL_STATUS, .enabled = true, .pos = global.palXY(16, 104) },
     };
-    _ = ui.createBox(global.palXY(2, 20), 4, ui.menuTextMaxWidth(&items) - 1, 0, false);
+    _ = ui.createBox(global.palXY(2, 20), BATTLEUI_MISC_ITEMS - 1, ui.menuTextMaxWidth(&items) - 1, 0, false);
     var i: u16 = 0;
     while (i < 5) : (i += 1) {
         var color: u8 = ui.MENUITEM_COLOR;
@@ -92,6 +98,13 @@ fn drawMiscMenu(current: u16, confirmed: bool) void {
         }
         text.drawText(text.getWord(items[i].num_word), items[i].pos, color, true, false);
     }
+    // 6th item — 情報. Drawn through text.drawText with raw BIG5 so the
+    // glyph hinting / shadow matches the rest of the menu.
+    const info_color: u8 = blk: {
+        if (current == 5) break :blk if (confirmed) ui.MENUITEM_COLOR_CONFIRMED else ui.menuItemColorSelected();
+        break :blk ui.MENUITEM_COLOR;
+    };
+    text.drawText(MISC_LABEL_INFO_BIG5, global.palXY(16, 122), info_color, true, false);
 }
 
 // PAL_BattleUIMiscMenuUpdate.
@@ -101,10 +114,10 @@ fn miscMenuUpdate() u16 {
     const k = input.state.key_press;
     if ((k & (input.KEY_UP | input.KEY_LEFT)) != 0) {
         g_cur_misc_menu_item -= 1;
-        if (g_cur_misc_menu_item < 0) g_cur_misc_menu_item = 4;
+        if (g_cur_misc_menu_item < 0) g_cur_misc_menu_item = BATTLEUI_MISC_ITEMS - 1;
     } else if ((k & (input.KEY_DOWN | input.KEY_RIGHT)) != 0) {
         g_cur_misc_menu_item += 1;
-        if (g_cur_misc_menu_item > 4) g_cur_misc_menu_item = 0;
+        if (g_cur_misc_menu_item > BATTLEUI_MISC_ITEMS - 1) g_cur_misc_menu_item = 0;
     } else if ((k & input.KEY_SEARCH) != 0) {
         return @as(u16, @intCast(g_cur_misc_menu_item)) + 1;
     } else if ((k & input.KEY_MENU) != 0) {
@@ -612,6 +625,7 @@ fn handleMiscSelection(w: u16) void {
             fight.commitAction(false);
         },
         5 => @import("playerstatus.zig").playerStatus(),
+        6 => @import("enemyinfo.zig").show(),
         else => {},
     }
 }

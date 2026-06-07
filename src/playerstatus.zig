@@ -16,6 +16,8 @@ const ui = @import("ui.zig");
 const text = @import("text.zig");
 const input = @import("input.zig");
 const util = @import("util.zig");
+const custom_words = @import("custom_words.zig");
+const objectdesc = @import("objectdesc.zig");
 
 // From ui.h.
 const STATUS_BACKGROUND_FBPNUM: u32 = 0;
@@ -199,6 +201,27 @@ pub fn playerStatus() void {
                 );
                 pj += 1;
             }
+        }
+
+        // 魔改 — beneficial statuses with their remaining round counts.
+        // Vanilla never surfaced these; SDLPAL fork shows them above the
+        // role's avatar. Buff_ids and labels stay in lockstep.
+        const buff_ids = [_]u16{
+            global.STATUS_PUPPET, global.STATUS_BRAVERY,
+            global.STATUS_PROTECT, global.STATUS_HASTE,
+            global.STATUS_DUAL_ATTACK,
+        };
+        const buff_labels = [_]custom_words.Label{
+            .puppet, .bravery, .protect, .haste, .dual_attack,
+        };
+        var bk: u32 = 0;
+        for (buff_ids, 0..) |sid, idx| {
+            const rounds = global.gpg.player_status[player_role][sid];
+            if (rounds == 0 or rounds > 999) continue; // skip equipment-granted (>999)
+            const by: i32 = 8 + @as(i32, @intCast(bk)) * 20;
+            custom_words.draw(buff_labels[idx], 283, by, ui.MENUITEM_COLOR_CONFIRMED);
+            ui.drawNumber(rounds, 2, global.palXY(269, @truncate(by + 4)), .blue, .right);
+            bk += 1;
         }
 
         video.updateScreen(null);
