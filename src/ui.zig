@@ -40,6 +40,40 @@ pub const NumColor = enum(u8) {
     cyan = 2,
 };
 
+// 魔改 — extended palette for in-battle damage numbers etc. Rather than
+// inline 10 copies of the digit RLE data we recolor the yellow glyphs
+// (sprite#19..28, pixels = 0xBD) at blit time via rleBlitMonoColor.
+// Each variant chooses (base, shift) so that
+//     output = (0x0D + shift, clamped) | base
+// hits the target palette index from the SDLPAL fork.
+pub const NumColorEx = enum(u8) {
+    yellow = 0, // 0xBD
+    blue = 1, //   0xDB
+    cyan = 2, //   0x8B
+    green = 3, //  0xC9
+    gold = 4, //   0x39
+    navy = 5, //   0x59
+    red = 6, //    0x19
+    purple = 7, // 0x69
+    pale = 8, //   0x08
+    gray = 9, //   0x05
+};
+
+fn numColorExParams(c: NumColorEx) struct { base: u8, shift: i32 } {
+    return switch (c) {
+        .yellow => .{ .base = 0xB0, .shift = 0 },
+        .blue => .{ .base = 0xD0, .shift = -2 },
+        .cyan => .{ .base = 0x80, .shift = -2 },
+        .green => .{ .base = 0xC0, .shift = -4 },
+        .gold => .{ .base = 0x30, .shift = -4 },
+        .navy => .{ .base = 0x50, .shift = -4 },
+        .red => .{ .base = 0x10, .shift = -4 },
+        .purple => .{ .base = 0x60, .shift = -4 },
+        .pale => .{ .base = 0x00, .shift = -5 },
+        .gray => .{ .base = 0x00, .shift = -8 },
+    };
+}
+
 pub const NumAlign = enum(u8) {
     left = 0,
     mid = 1,
@@ -260,6 +294,66 @@ pub fn deleteBox(box: ?Box) void {
     var b = box orelse return;
     restoreScreenArea(&b);
     if (b.saved_area) |sa| global.allocator.free(sa);
+}
+
+// PAL_DrawNumberEx — like drawNumber but supports the 10-color 魔改
+// palette. yellow/blue/cyan use the vanilla glyph sprites directly; the
+// other seven colors recolor the yellow glyph at blit time, avoiding
+// the need to ship 70 hand-authored RLE bitmaps.
+pub fn drawNumberEx(num_in: u32, length_in: u32, pos: palcommon.Pos, color: NumColorEx, align_: NumAlign) void {
+    // Pick the source sprite. For colors that have a native variant we
+    // use it (avoids one palette lookup per pixel); for everything else
+    // we recolor yellow.
+    const sprite_base: i32 = switch (color) {
+        .blue => 29,
+        .cyan => 56,
+        else => 19, // yellow source — recolor for the rest
+    };
+    const cp = numColorExParams(color);
+
+    var bitmaps: [10]?[]const u8 = undefined;
+    var i: i32 = 0;
+    while (i < 10) : (i += 1) {
+        bitmaps[@intCast(i)] = palcommon.spriteGetFrame(sprite_ui, sprite_base + i);
+    }
+
+    var n_actual: u32 = 0;
+    var t: u32 = num_in;
+    while (t > 0) {
+        t /= 10;
+        n_actual += 1;
+    }
+    if (n_actual > length_in) n_actual = length_in;
+    if (n_actual == 0) n_actual = 1;
+
+    var x: i32 = @as(i32, palcommon.palX(pos)) - 6;
+    const y: i32 = palcommon.palY(pos);
+
+    switch (align_) {
+        .left => x += 6 * @as(i32, @intCast(n_actual)),
+        .mid => x += 3 * @as(i32, @intCast(length_in + n_actual)),
+        .right => x += 6 * @as(i32, @intCast(length_in)),
+    }
+
+    const recolor = switch (color) {
+        .yellow, .blue, .cyan => false,
+        else => true,
+    };
+
+    var num = num_in;
+    var k = n_actual;
+    while (k > 0) : (k -= 1) {
+        if (bitmaps[num % 10]) |bmp| {
+            const xy = palcommon.palXY(@truncate(x), @truncate(y));
+            if (recolor) {
+                _ = palcommon.rleBlitMonoColor(bmp, &video.screen, xy, cp.base, cp.shift);
+            } else {
+                _ = palcommon.rleBlitToSurface(bmp, &video.screen, xy);
+            }
+        }
+        x -= 6;
+        num /= 10;
+    }
 }
 
 // PAL_DrawNumber — draw an integer using the UI sprite digits.

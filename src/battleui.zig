@@ -150,7 +150,7 @@ pub fn playerReady(player_index: u16) void {
 }
 
 // PAL_BattleUIShowNum — schedule a damage/heal number to float upward.
-pub fn showNum(num: u16, pos: u32, color: ui.NumColor) void {
+pub fn showNum(num: u16, pos: u32, color: ui.NumColorEx) void {
     var i: u32 = 0;
     while (i < battle.BATTLEUI_MAX_SHOWNUM) : (i += 1) {
         if (battle.g_battle.ui.show_num[i].num == 0) {
@@ -756,7 +756,7 @@ fn drawShowNumbers() void {
         if (frames > 10) {
             sn.num = 0;
         } else {
-            ui.drawNumber(
+            ui.drawNumberEx(
                 sn.num,
                 5,
                 global.palXY(global.palX(sn.pos), @truncate(@as(i32, global.palY(sn.pos)) - @as(i32, @intCast(frames)))),

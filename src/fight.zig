@@ -273,9 +273,9 @@ pub fn displayStatChange() bool {
             var y: i32 = @as(i32, global.palY(e.pos)) - 115;
             if (y < 10) y = 10;
             if (dmg < 0) {
-                showNum(@intCast(-dmg), global.palXY(@truncate(x), @truncate(y)), .yellow);
+                showNum(@intCast(-dmg), global.palXY(@truncate(x), @truncate(y)), .red);
             } else if (dmg > 0) {
-                showNum(@intCast(dmg), global.palXY(@truncate(x), @truncate(y)), .blue);
+                showNum(@intCast(dmg), global.palXY(@truncate(x), @truncate(y)), .cyan);
             }
             any = true;
         }
@@ -294,25 +294,30 @@ pub fn displayStatChange() bool {
             var y: i32 = @as(i32, global.palY(p.pos)) - 75;
             if (y < 10) y = 10;
             if (dmg < 0) {
-                showNum(@intCast(-dmg), global.palXY(@truncate(x), @truncate(y)), .yellow);
+                showNum(@intCast(-dmg), global.palXY(@truncate(x), @truncate(y)), .red);
             } else if (dmg > 0) {
-                showNum(@intCast(dmg), global.palXY(@truncate(x), @truncate(y)), .blue);
+                showNum(@intCast(dmg), global.palXY(@truncate(x), @truncate(y)), .cyan);
             }
             any = true;
         }
 
-        // MP delta — fight.c L690-L711. Only positive deltas (recovery)
-        // are shown; cyan (.cyan).
+        // MP delta — fight.c L690-L711. Recovery shows cyan; the 魔改
+        // EX_SHOW_MP_DROP path also surfaces drains in purple so a player
+        // can see their MP being burned by something other than their own
+        // spellcasts.
         const cur_mp: i32 = @as(i32, global.gpg.g.player_roles.mp[role]);
         const prev_mp: i32 = @as(i32, p.prev_mp);
         if (cur_mp != prev_mp) {
             const d_mp = cur_mp - prev_mp;
+            const x: i32 = @as(i32, global.palX(p.pos)) - 9;
+            var y: i32 = @as(i32, global.palY(p.pos)) - 67;
+            if (y < 10) y = 10;
             if (d_mp > 0) {
-                const x: i32 = @as(i32, global.palX(p.pos)) - 9;
-                var y: i32 = @as(i32, global.palY(p.pos)) - 67;
-                if (y < 10) y = 10;
-                showNum(@intCast(d_mp), global.palXY(@truncate(x), @truncate(y)), .cyan);
+                showNum(@intCast(d_mp), global.palXY(@truncate(x), @truncate(y)), .blue);
             }
+            // MP-drop display (魔改 EX_SHOW_MP_DROP) intentionally disabled —
+            // every spellcast would otherwise spam a purple number on the
+            // caster.
             any = true;
         }
     }

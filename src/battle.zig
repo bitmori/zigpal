@@ -150,7 +150,7 @@ pub const ShowNum = struct {
     num: u16 = 0,
     pos: u32 = 0,
     time: u32 = 0,
-    color: ui.NumColor = .yellow,
+    color: ui.NumColorEx = .yellow,
 };
 
 pub const BATTLEUI_MAX_SHOWNUM: u32 = 16;
