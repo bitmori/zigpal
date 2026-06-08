@@ -117,6 +117,9 @@ const BlitMode = union(enum) {
     shadow: void,
     color_shift: i32,
     mono_color: struct { base_color: u8, color_shift: i32 },
+    // 魔改 — horizontal flip; only normal pixel copy (no shadow / color
+    // shift). Source column x maps to destination column dx + width-1 - x.
+    mirror: void,
 };
 
 fn rleBlitGeneric(bitmap_rle: []const u8, surface: *Surface, pos: Pos, mode: BlitMode) i32 {
@@ -132,6 +135,10 @@ fn rleBlitGeneric(bitmap_rle: []const u8, surface: *Surface, pos: Pos, mode: Bli
         @as(i32, @intCast(ui_height)) + dy <= 0 or dy >= surface.h)
     {
         return 0;
+    }
+
+    if (mode == .mirror) {
+        return rleBlitMirror(rle, surface, dx, dy, ui_width, ui_height);
     }
 
     const ui_len = ui_width * ui_height;
@@ -227,6 +234,8 @@ fn rleBlitGeneric(bitmap_rle: []const u8, surface: *Surface, pos: Pos, mode: Bli
                             xi += 1;
                         }
                     },
+                    // mirror takes the early branch in rleBlitGeneric — never reaches here.
+                    .mirror => unreachable,
                 }
                 x += @intCast(k);
 
@@ -250,6 +259,96 @@ fn rleBlitGeneric(bitmap_rle: []const u8, surface: *Surface, pos: Pos, mode: Bli
     return 0;
 }
 
+// 魔改 — fork PAL_RLEBlitToSurfaceInMirror, ported segment-for-segment.
+// Caller has already skipped the file header and the 4-byte width/height
+// prefix is still on `rle` (we strip it here). dx0/dy0 are pre-clipped only
+// for the trivial off-screen rejection in rleBlitGeneric; the inner loop
+// does its own per-segment clipping just like the C version.
+fn rleBlitMirror(rle_in: []const u8, surface: *Surface, dx0: i32, dy0: i32, ui_w: u32, ui_h: u32) i32 {
+    const rle = rle_in[4..];
+    const total_len: u32 = ui_w * ui_h;
+
+    var i: u32 = 0;
+    var src_x: u32 = 0;
+    var src_y: u32 = 0;
+    var off: usize = 0;
+
+    while (i < total_len) {
+        const T = rle[off];
+        off += 1;
+
+        if ((T & 0x80) != 0 and T <= 0x80 + ui_w) {
+            const skip = @as(u32, T) - 0x80;
+            i += skip;
+            src_x += skip;
+            while (src_x >= ui_w) {
+                src_x -= ui_w;
+                src_y += 1;
+            }
+            continue;
+        }
+
+        // Skip rows entirely outside the surface up-front.
+        var y: i32 = dy0 + @as(i32, @intCast(src_y));
+        if (y < 0 or y >= surface.h) {
+            off += T;
+            i += T;
+            src_x += T;
+            while (src_x >= ui_w) {
+                src_x -= ui_w;
+                src_y += 1;
+            }
+            continue;
+        }
+
+        var row_start: usize = @intCast(y * surface.pitch);
+        var processed: u32 = 0;
+        var cur_src_x: u32 = src_x;
+
+        while (processed < T) {
+            const pixels_in_row: u32 = @min(@as(u32, T) - processed, ui_w - cur_src_x);
+
+            // Mirror-mapped destination column range for this row segment.
+            const dst_x_start: i32 = dx0 + @as(i32, @intCast(ui_w)) - 1 - @as(i32, @intCast(cur_src_x));
+            const dst_x_end: i32 = dx0 + @as(i32, @intCast(ui_w)) - 1 - @as(i32, @intCast(cur_src_x + pixels_in_row - 1));
+
+            const clip_left: i32 = @max(0, dst_x_end);
+            const clip_right: i32 = @min(surface.w - 1, dst_x_start);
+
+            if (clip_left <= clip_right) {
+                const px_clipped_left: i32 = clip_left - dst_x_end;
+                const px_to_draw: u32 = @intCast(clip_right - clip_left + 1);
+
+                var k: u32 = 0;
+                while (k < px_to_draw) : (k += 1) {
+                    const src_idx: usize = off + processed + @as(u32, @intCast(px_clipped_left)) + k;
+                    const dst_x: usize = @intCast(clip_right - @as(i32, @intCast(k)));
+                    surface.pixels[row_start + dst_x] = rle[src_idx];
+                }
+            }
+
+            processed += pixels_in_row;
+            cur_src_x += pixels_in_row;
+            if (cur_src_x >= ui_w) {
+                cur_src_x = 0;
+                y += 1;
+                if (y >= surface.h) break;
+                row_start = @intCast(y * surface.pitch);
+            }
+        }
+
+        off += T;
+        i += T;
+        src_x += T;
+        while (src_x >= ui_w) {
+            src_x -= ui_w;
+            src_y += 1;
+        }
+    }
+
+    return 0;
+}
+
 pub fn rleBlitToSurface(bitmap_rle: []const u8, surface: *Surface, pos: Pos) i32 {
     return rleBlitGeneric(bitmap_rle, surface, pos, .normal);
 }
@@ -264,6 +363,13 @@ pub fn rleBlitWithColorShift(bitmap_rle: []const u8, surface: *Surface, pos: Pos
 
 pub fn rleBlitMonoColor(bitmap_rle: []const u8, surface: *Surface, pos: Pos, color: u8, color_shift: i32) i32 {
     return rleBlitGeneric(bitmap_rle, surface, pos, .{ .mono_color = .{ .base_color = color & 0xF0, .color_shift = color_shift } });
+}
+
+// 魔改 — horizontally-flipped RLE blit. Decodes the RLE as usual but maps
+// source column x to destination column (dx + width - 1 - x). Used by the
+// magic-render Mirror mode (Magic.render_mode & MAGIC_RENDER_MIRROR).
+pub fn rleBlitToSurfaceInMirror(bitmap_rle: []const u8, surface: *Surface, pos: Pos) i32 {
+    return rleBlitGeneric(bitmap_rle, surface, pos, .mirror);
 }
 
 pub fn fbpBlitToSurface(bitmap_fbp: []const u8, surface: *Surface) i32 {

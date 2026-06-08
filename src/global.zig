@@ -96,6 +96,15 @@ pub const MAGIC_TYPE_APPLY_TO_PARTY: u16 = 5;
 pub const MAGIC_TYPE_TRANCE: u16 = 8;
 pub const MAGIC_TYPE_SUMMON: u16 = 9;
 
+// 魔改 — Magic.render_mode flags (was Magic.wUnknown in vanilla data).
+// SDLPAL fork repurposes this byte to gate alternate rendering for the magic
+// effect bitmap. Multiple flags may combine.
+pub const MAGIC_RENDER_REVERSE: u16 = 1; // play frames in reverse order
+pub const MAGIC_RENDER_MIRROR: u16 = 2; // horizontally flip the effect
+pub const MAGIC_RENDER_MIRROR_HERO_OFF: u16 = 4; // mirror hero-cast variant only
+pub const MAGIC_RENDER_MIRROR_ENEMY_OFF: u16 = 8; // mirror enemy-cast variant only
+pub const MAGIC_RENDER_TRIPLE_PARALLEL: u16 = 16; // attack-all: 3 staggered copies
+
 // LoadFlags
 pub const LOAD_NONE: u32 = 0;
 pub const LOAD_SCENE: u32 = 1 << 0;
@@ -356,7 +365,8 @@ pub const Magic = extern struct {
     effect_times: u16 align(1),
     shake: u16 align(1),
     wave: u16 align(1),
-    unknown: u16 align(1),
+    // 魔改 — repurposed from wUnknown. See MAGIC_RENDER_* flag constants.
+    render_mode: u16 align(1),
     cost_mp: u16 align(1),
     base_damage: u16 align(1),
     elemental: u16 align(1),

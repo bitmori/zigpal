@@ -2174,6 +2174,16 @@ pub fn battleShowPlayerOffMagicAnim(player_index: u16, object_id: u16, sTarget: 
     const iMagicNum: u32 = global.gpg.g.objects[object_id].magic().magic_number;
     const iEffectNum: u32 = global.gpg.g.magics[iMagicNum].effect;
 
+    // 魔改 — read render_mode once. Reverse flag flips frame index within
+    // the active span; Mirror (general or HERO_OFF specific) sets the
+    // global flag drawMagicSprite reads; TripleParallel swaps the
+    // ATTACK_ALL effect-position table for a tighter staggered triple.
+    const render_mode: u16 = global.gpg.g.magics[iMagicNum].render_mode;
+    const reverse: bool = (render_mode & global.MAGIC_RENDER_REVERSE) != 0;
+    const mirror: bool = (render_mode & (global.MAGIC_RENDER_MIRROR | global.MAGIC_RENDER_MIRROR_HERO_OFF)) != 0;
+    const triple_parallel: bool = (render_mode & global.MAGIC_RENDER_TRIPLE_PARALLEL) != 0;
+    battle.g_battle.magic_render_mirror = mirror;
+
     // PAL_MKFGetDecompressedSize → if <= 0, return.
     const decomp_size = fire.getDecompressedSize(iEffectNum, false) catch return;
     if (decomp_size == 0) return;
@@ -2236,10 +2246,13 @@ pub fn battleShowPlayerOffMagicAnim(player_index: u16, object_id: u16, sTarget: 
                 fk = @mod(fk, n - fire_delay);
                 fk += fire_delay;
             }
+            // 魔改 — Reverse plays frames within the active span backwards.
+            if (reverse) fk = n - 1 - fk;
             battle.g_battle.magic_bitmap = palcommon.spriteGetFrame(lpSpriteEffect, fk);
         } else {
             video.shakeScreen(@intCast(i), 3);
             fk = @mod(l - shake - 1, n);
+            if (reverse) fk = n - 1 - fk;
             battle.g_battle.magic_bitmap = palcommon.spriteGetFrame(lpSpriteEffect, fk);
         }
 
@@ -2249,6 +2262,7 @@ pub fn battleShowPlayerOffMagicAnim(player_index: u16, object_id: u16, sTarget: 
             std.Thread.yield() catch {};
             if (util.shouldQuit()) {
                 battle.g_battle.magic_bitmap = null;
+                battle.g_battle.magic_render_mirror = false;
                 return;
             }
         }
@@ -2269,15 +2283,24 @@ pub fn battleShowPlayerOffMagicAnim(player_index: u16, object_id: u16, sTarget: 
 
         if (m_type == global.MAGIC_TYPE_NORMAL) {
             std.debug.assert(sTarget != -1);
-            const tx: i32 = @as(i32, global.palX(battle.g_battle.enemies[@intCast(sTarget)].pos)) +
-                @as(i16, @bitCast(global.gpg.g.magics[iMagicNum].x_offset));
+            // 魔改 — when mirrored on the hero side, negate x_offset so the
+            // flipped bitmap still leads from the caster toward the target.
+            const x_off: i32 = blk: {
+                const raw: i32 = @as(i16, @bitCast(global.gpg.g.magics[iMagicNum].x_offset));
+                break :blk if (mirror) -raw else raw;
+            };
+            const tx: i32 = @as(i32, global.palX(battle.g_battle.enemies[@intCast(sTarget)].pos)) + x_off;
             const ty: i32 = @as(i32, global.palY(battle.g_battle.enemies[@intCast(sTarget)].pos)) +
                 @as(i16, @bitCast(global.gpg.g.magics[iMagicNum].y_offset));
             battle.addSpriteObject(.magic, @intCast(iMagicNum), global.palXY(@truncate(tx), @truncate(ty)), layer_off, false);
             if (keep_effect) blitMagicResidueToBackground(lpSpriteEffect, fk, tx, ty);
         } else if (m_type == global.MAGIC_TYPE_ATTACK_ALL) {
             std.debug.assert(sTarget == -1);
-            const effectpos = [_][2]i32{ .{ 70, 140 }, .{ 100, 110 }, .{ 160, 100 } };
+            // 魔改 — TripleParallel uses a tighter staggered cluster.
+            const effectpos: [3][2]i32 = if (triple_parallel)
+                .{ .{ 70, 100 }, .{ 90, 120 }, .{ 110, 140 } }
+            else
+                .{ .{ 70, 140 }, .{ 100, 110 }, .{ 160, 100 } };
             for (effectpos) |p| {
                 const tx: i32 = p[0] + @as(i16, @bitCast(global.gpg.g.magics[iMagicNum].x_offset));
                 const ty: i32 = p[1] + @as(i16, @bitCast(global.gpg.g.magics[iMagicNum].y_offset));
@@ -2302,6 +2325,7 @@ pub fn battleShowPlayerOffMagicAnim(player_index: u16, object_id: u16, sTarget: 
     global.gpg.screen_wave = wave_save;
     video.shakeScreen(0, 0);
     battle.g_battle.magic_bitmap = null;
+    battle.g_battle.magic_render_mirror = false;
 
     var k: u32 = 0;
     while (battle.g_battle.max_enemy_index >= 0 and k <= @as(u32, @intCast(battle.g_battle.max_enemy_index))) : (k += 1) {
@@ -2332,6 +2356,14 @@ pub fn battleShowEnemyMagicAnim(enemy_index: u16, object_id: u16, sTarget: i32) 
 
     const iMagicNum: u32 = global.gpg.g.objects[object_id].magic().magic_number;
     const iEffectNum: u32 = global.gpg.g.magics[iMagicNum].effect;
+
+    // 魔改 — same flag layout as the player offensive variant. The enemy
+    // side honours the general MIRROR flag and the enemy-specific
+    // MIRROR_ENEMY_OFF flag.
+    const render_mode: u16 = global.gpg.g.magics[iMagicNum].render_mode;
+    const reverse: bool = (render_mode & global.MAGIC_RENDER_REVERSE) != 0;
+    const mirror: bool = (render_mode & (global.MAGIC_RENDER_MIRROR | global.MAGIC_RENDER_MIRROR_ENEMY_OFF)) != 0;
+    battle.g_battle.magic_render_mirror = mirror;
 
     const decomp_size = fire.getDecompressedSize(iEffectNum, false) catch return;
     if (decomp_size == 0) return;
@@ -2383,6 +2415,7 @@ pub fn battleShowEnemyMagicAnim(enemy_index: u16, object_id: u16, sTarget: i32) 
                 fk = @mod(fk, n - fire_delay);
                 fk += fire_delay;
             }
+            if (reverse) fk = n - 1 - fk;
             battle.g_battle.magic_bitmap = palcommon.spriteGetFrame(lpSpriteEffect, fk);
 
             // fight.c L2713 — re-trigger the magic SFX every time the effect
@@ -2404,6 +2437,7 @@ pub fn battleShowEnemyMagicAnim(enemy_index: u16, object_id: u16, sTarget: i32) 
         } else {
             video.shakeScreen(@intCast(i), 3);
             fk = @mod(l - shake - 1, n);
+            if (reverse) fk = n - 1 - fk;
             battle.g_battle.magic_bitmap = palcommon.spriteGetFrame(lpSpriteEffect, fk);
         }
 
@@ -2412,6 +2446,7 @@ pub fn battleShowEnemyMagicAnim(enemy_index: u16, object_id: u16, sTarget: i32) 
             std.Thread.yield() catch {};
             if (util.shouldQuit()) {
                 battle.g_battle.magic_bitmap = null;
+                battle.g_battle.magic_render_mirror = false;
                 return;
             }
         }
@@ -2427,8 +2462,11 @@ pub fn battleShowEnemyMagicAnim(enemy_index: u16, object_id: u16, sTarget: i32) 
 
         if (m_type == global.MAGIC_TYPE_NORMAL) {
             std.debug.assert(sTarget != -1);
-            const tx: i32 = @as(i32, global.palX(battle.g_battle.players[@intCast(sTarget)].pos)) +
-                @as(i16, @bitCast(global.gpg.g.magics[iMagicNum].x_offset));
+            const x_off: i32 = blk: {
+                const raw: i32 = @as(i16, @bitCast(global.gpg.g.magics[iMagicNum].x_offset));
+                break :blk if (mirror) -raw else raw;
+            };
+            const tx: i32 = @as(i32, global.palX(battle.g_battle.players[@intCast(sTarget)].pos)) + x_off;
             const ty: i32 = @as(i32, global.palY(battle.g_battle.players[@intCast(sTarget)].pos)) +
                 @as(i16, @bitCast(global.gpg.g.magics[iMagicNum].y_offset));
             battle.addSpriteObject(.magic, @intCast(iMagicNum), global.palXY(@truncate(tx), @truncate(ty)), layer_off, false);
@@ -2460,6 +2498,7 @@ pub fn battleShowEnemyMagicAnim(enemy_index: u16, object_id: u16, sTarget: i32) 
     global.gpg.screen_wave = wave_save;
     video.shakeScreen(0, 0);
     battle.g_battle.magic_bitmap = null;
+    battle.g_battle.magic_render_mirror = false;
 
     var k: u32 = 0;
     while (k <= global.gpg.max_party_member_index) : (k += 1) {
@@ -2491,10 +2530,16 @@ pub fn battleShowPlayerDefMagicAnim(player_index: u16, object_id: u16, sTarget: 
     const speed: i32 = @as(i16, @bitCast(@as(u16, @bitCast(global.gpg.g.magics[iMagicNum].speed))));
     const frame_ms: u32 = @intCast(@max((speed + 5) * 10, 10));
 
+    // 魔改 — Reverse plays frames backwards. Mirror is intentionally not
+    // honoured for defensive magic in the SDLPAL fork (the visual sits on
+    // the friendly target so mirroring would look wrong).
+    const reverse: bool = (global.gpg.g.magics[iMagicNum].render_mode & global.MAGIC_RENDER_REVERSE) != 0;
+
     var dw_time: u32 = util.getTicks() + frame_ms;
     var i: i32 = 0;
     while (i < n) : (i += 1) {
-        battle.g_battle.magic_bitmap = palcommon.spriteGetFrame(lpSpriteEffect, i);
+        const fk: i32 = if (reverse) n - 1 - i else i;
+        battle.g_battle.magic_bitmap = palcommon.spriteGetFrame(lpSpriteEffect, fk);
 
         // fight.c L2501 — play the magic cue once at fire_delay frame.
         if (i == @as(i32, global.gpg.g.magics[iMagicNum].fire_delay)) {
