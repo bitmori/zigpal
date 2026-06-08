@@ -96,14 +96,26 @@ pub const MAGIC_TYPE_APPLY_TO_PARTY: u16 = 5;
 pub const MAGIC_TYPE_TRANCE: u16 = 8;
 pub const MAGIC_TYPE_SUMMON: u16 = 9;
 
-// 魔改 — Magic.render_mode flags (was Magic.wUnknown in vanilla data).
-// SDLPAL fork repurposes this byte to gate alternate rendering for the magic
-// effect bitmap. Multiple flags may combine.
-pub const MAGIC_RENDER_REVERSE: u16 = 1; // play frames in reverse order
-pub const MAGIC_RENDER_MIRROR: u16 = 2; // horizontally flip the effect
-pub const MAGIC_RENDER_MIRROR_HERO_OFF: u16 = 4; // mirror hero-cast variant only
-pub const MAGIC_RENDER_MIRROR_ENEMY_OFF: u16 = 8; // mirror enemy-cast variant only
-pub const MAGIC_RENDER_TRIPLE_PARALLEL: u16 = 16; // attack-all: 3 staggered copies
+// 魔改 — Magic.render_mode flags (field offset 11, was wUnknown in vanilla).
+// Multiple flags may combine via bitwise OR.
+//
+//  val  flag                     effect
+//  ---  -----------------------  ------------------------------------
+//    1  REVERSE                  帧倒序播放 (双方)
+//    2  REVERSE_HERO_OFF         帧倒序 (仅我方释放)
+//    4  REVERSE_ENEMY_OFF        帧倒序 (仅敌方释放)
+//    8  MIRROR                   水平翻转 (双方)
+//   16  MIRROR_HERO_OFF          水平翻转 (仅我方释放)
+//   32  MIRROR_ENEMY_OFF         水平翻转 (仅敌方释放)
+//   64  TRIPLE_PARALLEL          attack-all 时三帧平行错位
+//
+pub const MAGIC_RENDER_REVERSE: u16 = 1;
+pub const MAGIC_RENDER_REVERSE_HERO_OFF: u16 = 2;
+pub const MAGIC_RENDER_REVERSE_ENEMY_OFF: u16 = 4;
+pub const MAGIC_RENDER_MIRROR: u16 = 8;
+pub const MAGIC_RENDER_MIRROR_HERO_OFF: u16 = 16;
+pub const MAGIC_RENDER_MIRROR_ENEMY_OFF: u16 = 32;
+pub const MAGIC_RENDER_TRIPLE_PARALLEL: u16 = 64;
 
 // LoadFlags
 pub const LOAD_NONE: u32 = 0;

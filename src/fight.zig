@@ -2185,7 +2185,7 @@ pub fn battleShowPlayerOffMagicAnim(player_index: u16, object_id: u16, sTarget: 
     // global flag drawMagicSprite reads; TripleParallel swaps the
     // ATTACK_ALL effect-position table for a tighter staggered triple.
     const render_mode: u16 = global.gpg.g.magics[iMagicNum].render_mode;
-    const reverse: bool = (render_mode & global.MAGIC_RENDER_REVERSE) != 0;
+    const reverse: bool = (render_mode & (global.MAGIC_RENDER_REVERSE | global.MAGIC_RENDER_REVERSE_HERO_OFF)) != 0;
     const mirror: bool = (render_mode & (global.MAGIC_RENDER_MIRROR | global.MAGIC_RENDER_MIRROR_HERO_OFF)) != 0;
     const triple_parallel: bool = (render_mode & global.MAGIC_RENDER_TRIPLE_PARALLEL) != 0;
     battle.g_battle.magic_render_mirror = mirror;
@@ -2366,10 +2366,10 @@ pub fn battleShowEnemyMagicAnim(enemy_index: u16, object_id: u16, sTarget: i32) 
     const iEffectNum: u32 = global.gpg.g.magics[iMagicNum].effect;
 
     // 魔改 — same flag layout as the player offensive variant. The enemy
-    // side honours the general MIRROR flag and the enemy-specific
-    // MIRROR_ENEMY_OFF flag.
+    // side honours the general MIRROR/REVERSE flags and the enemy-specific
+    // variants.
     const render_mode: u16 = global.gpg.g.magics[iMagicNum].render_mode;
-    const reverse: bool = (render_mode & global.MAGIC_RENDER_REVERSE) != 0;
+    const reverse: bool = (render_mode & (global.MAGIC_RENDER_REVERSE | global.MAGIC_RENDER_REVERSE_ENEMY_OFF)) != 0;
     const mirror: bool = (render_mode & (global.MAGIC_RENDER_MIRROR | global.MAGIC_RENDER_MIRROR_ENEMY_OFF)) != 0;
     battle.g_battle.magic_render_mirror = mirror;
 
@@ -2539,9 +2539,9 @@ pub fn battleShowPlayerDefMagicAnim(player_index: u16, object_id: u16, sTarget: 
     const frame_ms: u32 = @intCast(@max((speed + 5) * 10, 10));
 
     // 魔改 — Reverse plays frames backwards. Mirror is intentionally not
-    // honoured for defensive magic in the SDLPAL fork (the visual sits on
-    // the friendly target so mirroring would look wrong).
-    const reverse: bool = (global.gpg.g.magics[iMagicNum].render_mode & global.MAGIC_RENDER_REVERSE) != 0;
+    // honoured for defensive magic (the visual sits on the friendly target).
+    const render_mode: u16 = global.gpg.g.magics[iMagicNum].render_mode;
+    const reverse: bool = (render_mode & (global.MAGIC_RENDER_REVERSE | global.MAGIC_RENDER_REVERSE_HERO_OFF)) != 0;
 
     var dw_time: u32 = util.getTicks() + frame_ms;
     var i: i32 = 0;
