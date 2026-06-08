@@ -33,6 +33,9 @@ pub const KEY_STATUS: u32 = 1 << 14;
 pub const KEY_FORCE: u32 = 1 << 15;
 pub const KEY_HOME: u32 = 1 << 16;
 pub const KEY_END: u32 = 1 << 17;
+// 魔改 — Z key in SDLPAL fork. On the world map opens the same status
+// screen as KEY_STATUS; in battle it opens 《情報》(enemyinfo.show).
+pub const KEY_INFO: u32 = 1 << 18;
 
 // PALINPUTSTATE
 pub const InputState = struct {
@@ -131,6 +134,7 @@ const all_keys = [_]u32{
     KEY_MENU, KEY_SEARCH, KEY_DOWN, KEY_LEFT, KEY_UP, KEY_RIGHT,
     KEY_PGUP, KEY_PGDN, KEY_REPEAT, KEY_AUTO, KEY_DEFEND, KEY_USEITEM,
     KEY_THROWITEM, KEY_FLEE, KEY_STATUS, KEY_FORCE, KEY_HOME, KEY_END,
+    KEY_INFO,
 };
 
 // PAL_ProcessEvent — translate raw_keys bitmap into InputState updates.

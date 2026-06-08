@@ -327,6 +327,12 @@ pub fn update() void {
         input.clearKeyState();
         return;
     }
+    if ((input.state.key_press & input.KEY_INFO) != 0) {
+        @import("enemyinfo.zig").show();
+        drawShowNumbers();
+        input.clearKeyState();
+        return;
+    }
 
     // While we're not in the SELECT_MOVE state we still keep the UI alive.
     if (battle.g_battle.ui.state == .wait) {

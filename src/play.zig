@@ -223,7 +223,9 @@ pub fn startFrame() void {
         @import("itemmenu.zig").gameEquipItem();
     } else if ((k & input.KEY_FORCE) != 0) {
         @import("magicmenu.zig").inGameMagicMenu();
-    } else if ((k & input.KEY_STATUS) != 0) {
+    } else if ((k & (input.KEY_STATUS | input.KEY_INFO)) != 0) {
+        // 魔改: on the world map there's only one info screen, so STATUS
+        // and the new INFO key both open it.
         @import("playerstatus.zig").playerStatus();
     } else if ((k & input.KEY_SEARCH) != 0) {
         search();

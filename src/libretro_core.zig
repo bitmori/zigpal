@@ -132,22 +132,26 @@ fn pumpJoypadInput() void {
     const sf = input_state_cb orelse return;
 
     var keys: u32 = 0;
+    // D-pad — movement / menu cursor. Same on every screen.
     if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_UP) != 0) keys |= input.KEY_UP;
     if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_DOWN) != 0) keys |= input.KEY_DOWN;
     if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_LEFT) != 0) keys |= input.KEY_LEFT;
     if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_RIGHT) != 0) keys |= input.KEY_RIGHT;
+    // Face buttons.
     if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_A) != 0) keys |= input.KEY_SEARCH;
     if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_B) != 0) keys |= input.KEY_MENU;
-    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_X) != 0) keys |= input.KEY_FORCE;
-    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_Y) != 0) keys |= input.KEY_FLEE;
-    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_START) != 0) keys |= input.KEY_MENU;
-    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_SELECT) != 0) keys |= input.KEY_STATUS;
+    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_X) != 0) keys |= input.KEY_DEFEND;
+    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_Y) != 0) keys |= input.KEY_USEITEM;
+    // Start / Select.
+    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_START) != 0) keys |= input.KEY_STATUS;
+    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_SELECT) != 0) keys |= input.KEY_INFO;
+    // Shoulders + triggers + sticks.
     if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_L) != 0) keys |= input.KEY_PGUP;
     if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_R) != 0) keys |= input.KEY_PGDN;
-    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_L2) != 0) keys |= input.KEY_DEFEND;
-    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_R2) != 0) keys |= input.KEY_USEITEM;
-    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_R3) != 0) keys |= input.KEY_AUTO;
-    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_L3) != 0) keys |= input.KEY_REPEAT;
+    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_L2) != 0) keys |= input.KEY_THROWITEM;
+    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_R2) != 0) keys |= input.KEY_REPEAT;
+    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_L3) != 0) keys |= input.KEY_AUTO;
+    if (sf(0, c.RETRO_DEVICE_JOYPAD, 0, c.RETRO_DEVICE_ID_JOYPAD_R3) != 0) keys |= input.KEY_FLEE;
 
     input.raw_keys.store(keys, .monotonic);
 }
