@@ -7,8 +7,9 @@
 //! DSL is whitespace-tokenised, one statement per line. MVP supports a single
 //! command:
 //!
-//!   ADD_CASH <int>                      # add to gpg.cash, clamped to u32
-//!   CHANGE_MAGIC_DATA <id> <off> <val>  # poke Magic[id] field at u16 offset
+//!   ADD_CASH <int>                          # add to gpg.cash, clamped to u32
+//!   CHANGE_MAGIC_DATA <id> <off> <val>      # poke Magic[id] field at u16 offset
+//!   EDIT_SCRIPT <entry> <op> <a1> <a2> <a3> # rewrite script_entries[entry]
 //!
 //! The selection UI mirrors magic_menu.magicSelectionMenuUpdate so the hack
 //! menu inherits the same chrome (cash box on the left, grid in the centre,
@@ -205,6 +206,66 @@ fn execLine(line: []const u8) void {
         // Magic is align(1); cast through an align(1) array view.
         const raw: *align(1) [n_fields]u16 = @ptrCast(&global.gpg.g.magics[@intCast(id)]);
         raw[@intCast(off)] = @truncate(@as(u64, @bitCast(val)));
+    } else if (std.mem.eql(u8, cmd, "EDIT_SCRIPT")) {
+        // ScriptEntry = { op: u16, operand: [3]u16 }. Overwrite all four
+        // words of the entry at the given index.
+        const entry_tok = nextToken(&rest) orelse {
+            logErr("EDIT_SCRIPT needs <entry> <op> <a1> <a2> <a3>", .{});
+            return;
+        };
+        const op_tok = nextToken(&rest) orelse {
+            logErr("EDIT_SCRIPT needs <entry> <op> <a1> <a2> <a3>", .{});
+            return;
+        };
+        const a1_tok = nextToken(&rest) orelse {
+            logErr("EDIT_SCRIPT needs <entry> <op> <a1> <a2> <a3>", .{});
+            return;
+        };
+        const a2_tok = nextToken(&rest) orelse {
+            logErr("EDIT_SCRIPT needs <entry> <op> <a1> <a2> <a3>", .{});
+            return;
+        };
+        const a3_tok = nextToken(&rest) orelse {
+            logErr("EDIT_SCRIPT needs <entry> <op> <a1> <a2> <a3>", .{});
+            return;
+        };
+        const entry = parseI64(entry_tok) orelse {
+            logErr("EDIT_SCRIPT: bad entry '{s}'", .{entry_tok});
+            return;
+        };
+        const op = parseI64(op_tok) orelse {
+            logErr("EDIT_SCRIPT: bad op '{s}'", .{op_tok});
+            return;
+        };
+        const a1 = parseI64(a1_tok) orelse {
+            logErr("EDIT_SCRIPT: bad arg1 '{s}'", .{a1_tok});
+            return;
+        };
+        const a2 = parseI64(a2_tok) orelse {
+            logErr("EDIT_SCRIPT: bad arg2 '{s}'", .{a2_tok});
+            return;
+        };
+        const a3 = parseI64(a3_tok) orelse {
+            logErr("EDIT_SCRIPT: bad arg3 '{s}'", .{a3_tok});
+            return;
+        };
+        const n_entries: i64 = @intCast(global.gpg.g.script_entries.len);
+        if (entry < 0 or entry >= n_entries) {
+            logErr("EDIT_SCRIPT: entry {} out of range [0,{})", .{ entry, n_entries });
+            return;
+        }
+        const raws = [_]i64{ op, a1, a2, a3 };
+        for (raws) |w| {
+            if (w < std.math.minInt(i16) or w > std.math.maxInt(u16)) {
+                logErr("EDIT_SCRIPT: word {} doesn't fit in 16 bits", .{w});
+                return;
+            }
+        }
+        const e = &global.gpg.g.script_entries[@intCast(entry)];
+        e.operation = @truncate(@as(u64, @bitCast(op)));
+        e.operand[0] = @truncate(@as(u64, @bitCast(a1)));
+        e.operand[1] = @truncate(@as(u64, @bitCast(a2)));
+        e.operand[2] = @truncate(@as(u64, @bitCast(a3)));
     } else {
         logErr("unknown command: '{s}'", .{cmd});
     }
