@@ -7,7 +7,8 @@
 //! DSL is whitespace-tokenised, one statement per line. MVP supports a single
 //! command:
 //!
-//!   ADD_CASH <int>     # add to gpg.cash, clamped to u32 range
+//!   ADD_CASH <int>                      # add to gpg.cash, clamped to u32
+//!   CHANGE_MAGIC_DATA <id> <off> <val>  # poke Magic[id] field at u16 offset
 //!
 //! The selection UI mirrors magic_menu.magicSelectionMenuUpdate so the hack
 //! menu inherits the same chrome (cash box on the left, grid in the centre,
@@ -159,6 +160,51 @@ fn execLine(line: []const u8) void {
         const new = cur + v;
         const clamped: u32 = if (new < 0) 0 else if (new > 0xFFFFFFFF) 0xFFFFFFFF else @intCast(new);
         global.gpg.cash = clamped;
+    } else if (std.mem.eql(u8, cmd, "CHANGE_MAGIC_DATA")) {
+        // Magic is 16 u16/i16 fields packed align(1) — treat it as [N]u16 and
+        // poke by index. Caller writes the raw word (i16 fields take two's
+        // complement bit pattern).
+        const id_tok = nextToken(&rest) orelse {
+            logErr("CHANGE_MAGIC_DATA needs <id> <offset> <value>", .{});
+            return;
+        };
+        const off_tok = nextToken(&rest) orelse {
+            logErr("CHANGE_MAGIC_DATA needs <id> <offset> <value>", .{});
+            return;
+        };
+        const val_tok = nextToken(&rest) orelse {
+            logErr("CHANGE_MAGIC_DATA needs <id> <offset> <value>", .{});
+            return;
+        };
+        const id = parseI64(id_tok) orelse {
+            logErr("CHANGE_MAGIC_DATA: bad id '{s}'", .{id_tok});
+            return;
+        };
+        const off = parseI64(off_tok) orelse {
+            logErr("CHANGE_MAGIC_DATA: bad offset '{s}'", .{off_tok});
+            return;
+        };
+        const val = parseI64(val_tok) orelse {
+            logErr("CHANGE_MAGIC_DATA: bad value '{s}'", .{val_tok});
+            return;
+        };
+        const n_magics: i64 = @intCast(global.gpg.g.magics.len);
+        if (id < 0 or id >= n_magics) {
+            logErr("CHANGE_MAGIC_DATA: id {} out of range [0,{})", .{ id, n_magics });
+            return;
+        }
+        const n_fields: usize = @sizeOf(global.Magic) / 2;
+        if (off < 0 or off >= n_fields) {
+            logErr("CHANGE_MAGIC_DATA: offset {} out of range [0,{})", .{ off, n_fields });
+            return;
+        }
+        if (val < std.math.minInt(i16) or val > std.math.maxInt(u16)) {
+            logErr("CHANGE_MAGIC_DATA: value {} doesn't fit in 16 bits", .{val});
+            return;
+        }
+        // Magic is align(1); cast through an align(1) array view.
+        const raw: *align(1) [n_fields]u16 = @ptrCast(&global.gpg.g.magics[@intCast(id)]);
+        raw[@intCast(off)] = @truncate(@as(u64, @bitCast(val)));
     } else {
         logErr("unknown command: '{s}'", .{cmd});
     }
