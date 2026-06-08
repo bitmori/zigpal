@@ -278,7 +278,7 @@ fn rleBlitMirror(rle_in: []const u8, surface: *Surface, dx0: i32, dy0: i32, ui_w
         const T = rle[off];
         off += 1;
 
-        if ((T & 0x80) != 0 and T <= 0x80 + ui_w) {
+        if ((T & 0x80) != 0 and T <= 0x80 + @as(u8, @intCast(@min(ui_w, 0x7F)))) {
             const skip = @as(u32, T) - 0x80;
             i += skip;
             src_x += skip;

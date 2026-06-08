@@ -2308,7 +2308,8 @@ pub fn battleShowPlayerOffMagicAnim(player_index: u16, object_id: u16, sTarget: 
             else
                 .{ .{ 70, 140 }, .{ 100, 110 }, .{ 160, 100 } };
             for (effectpos) |p| {
-                const tx: i32 = p[0] + @as(i16, @bitCast(global.gpg.g.magics[iMagicNum].x_offset));
+                const raw_x: i32 = @as(i16, @bitCast(global.gpg.g.magics[iMagicNum].x_offset));
+                const tx: i32 = p[0] + if (mirror) -raw_x else raw_x;
                 const ty: i32 = p[1] + @as(i16, @bitCast(global.gpg.g.magics[iMagicNum].y_offset));
                 battle.addSpriteObject(.magic, @intCast(iMagicNum), global.palXY(@truncate(tx), @truncate(ty)), layer_off, false);
                 if (keep_effect) blitMagicResidueToBackground(lpSpriteEffect, fk, tx, ty);
@@ -2317,7 +2318,8 @@ pub fn battleShowPlayerOffMagicAnim(player_index: u16, object_id: u16, sTarget: 
             std.debug.assert(sTarget == -1);
             const tx0: i32 = if (m_type == global.MAGIC_TYPE_ATTACK_WHOLE) 120 else 160;
             const ty0: i32 = if (m_type == global.MAGIC_TYPE_ATTACK_WHOLE) 100 else 200;
-            const tx: i32 = tx0 + @as(i16, @bitCast(global.gpg.g.magics[iMagicNum].x_offset));
+            const raw_x: i32 = @as(i16, @bitCast(global.gpg.g.magics[iMagicNum].x_offset));
+            const tx: i32 = tx0 + if (mirror) -raw_x else raw_x;
             const ty: i32 = ty0 + @as(i16, @bitCast(global.gpg.g.magics[iMagicNum].y_offset));
             battle.addSpriteObject(.magic, @intCast(iMagicNum), global.palXY(@truncate(tx), @truncate(ty)), layer_off, false);
             if (keep_effect) blitMagicResidueToBackground(lpSpriteEffect, fk, tx, ty);
