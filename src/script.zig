@@ -1596,11 +1596,18 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
             }
         },
         0x0075 => {
+            // 魔改 — 4-person party. The fork packs the 4th role into the
+            // high byte of operand[2]: members = { op[0], op[1], op[2]&0xFF, op[2]>>8 }.
+            const members = [4]u16{
+                p_script.operand[0],
+                p_script.operand[1],
+                p_script.operand[2] & 0x00FF,
+                p_script.operand[2] >> 8,
+            };
             global.gpg.max_party_member_index = 0;
-            var i: usize = 0;
-            while (i < 3) : (i += 1) {
-                if (p_script.operand[i] != 0) {
-                    global.gpg.party[global.gpg.max_party_member_index].player_role = p_script.operand[i] - 1;
+            for (members) |m| {
+                if (m != 0) {
+                    global.gpg.party[global.gpg.max_party_member_index].player_role = m - 1;
                     global.gpg.max_party_member_index += 1;
                 }
             }

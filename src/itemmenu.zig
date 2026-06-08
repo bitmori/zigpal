@@ -402,33 +402,36 @@ pub fn itemUseMenu(item_to_use: u16) u16 {
             selected_player = 0;
         }
 
-        _ = ui.createBox(global.palXY(110, 2), 7, 9, 0, false);
+        // 魔改 — box height 8 so 4 player names fit on the left.
+        _ = ui.createBox(global.palXY(110, 2), 8, 9, 0, false);
 
-        text.drawText(text.getWord(STATUS_LABEL_LEVEL), global.palXY(200, 16), ITEMUSEMENU_COLOR_STATLABEL, true, false);
-        text.drawText(text.getWord(STATUS_LABEL_HP), global.palXY(200, 34), ITEMUSEMENU_COLOR_STATLABEL, true, false);
-        text.drawText(text.getWord(STATUS_LABEL_MP), global.palXY(200, 52), ITEMUSEMENU_COLOR_STATLABEL, true, false);
-        text.drawText(text.getWord(STATUS_LABEL_ATTACKPOWER), global.palXY(200, 70), ITEMUSEMENU_COLOR_STATLABEL, true, false);
-        text.drawText(text.getWord(STATUS_LABEL_MAGICPOWER), global.palXY(200, 88), ITEMUSEMENU_COLOR_STATLABEL, true, false);
-        text.drawText(text.getWord(STATUS_LABEL_RESISTANCE), global.palXY(200, 106), ITEMUSEMENU_COLOR_STATLABEL, true, false);
-        text.drawText(text.getWord(STATUS_LABEL_DEXTERITY), global.palXY(200, 124), ITEMUSEMENU_COLOR_STATLABEL, true, false);
-        text.drawText(text.getWord(STATUS_LABEL_FLEERATE), global.palXY(200, 142), ITEMUSEMENU_COLOR_STATLABEL, true, false);
+        // Stat labels at 18px spacing to fit within the taller box.
+        const stat_labels = [_]u16{
+            STATUS_LABEL_LEVEL, STATUS_LABEL_HP, STATUS_LABEL_MP,
+            STATUS_LABEL_ATTACKPOWER, STATUS_LABEL_MAGICPOWER,
+            STATUS_LABEL_RESISTANCE, STATUS_LABEL_DEXTERITY, STATUS_LABEL_FLEERATE,
+        };
+        for (stat_labels, 0..) |lbl, j| {
+            text.drawText(text.getWord(lbl), global.palXY(200, @intCast(16 + 18 * @as(i32, @intCast(j)))), ITEMUSEMENU_COLOR_STATLABEL, true, false);
+        }
 
         const role: u16 = global.gpg.party[@intCast(selected_player)].player_role;
 
+        // Stat values — 18px spacing to match labels.
         ui.drawNumber(global.gpg.g.player_roles.level[role], 4, global.palXY(240, 20), .yellow, .right);
         if (palcommon.spriteGetFrame(ui.sprite_ui, SPRITENUM_SLASH)) |slash| {
-            _ = palcommon.rleBlitToSurface(slash, &video.screen, global.palXY(263, 38));
-            _ = palcommon.rleBlitToSurface(slash, &video.screen, global.palXY(263, 56));
+            _ = palcommon.rleBlitToSurface(slash, &video.screen, global.palXY(263, 16 + 18 + 2));
+            _ = palcommon.rleBlitToSurface(slash, &video.screen, global.palXY(263, 16 + 18 * 2 + 2));
         }
-        ui.drawNumber(global.gpg.g.player_roles.max_hp[role], 4, global.palXY(261, 40), .blue, .right);
-        ui.drawNumber(global.gpg.g.player_roles.hp[role], 4, global.palXY(240, 37), .yellow, .right);
-        ui.drawNumber(global.gpg.g.player_roles.max_mp[role], 4, global.palXY(261, 58), .blue, .right);
-        ui.drawNumber(global.gpg.g.player_roles.mp[role], 4, global.palXY(240, 55), .yellow, .right);
-        ui.drawNumber(global.getPlayerAttackStrength(role), 4, global.palXY(240, 74), .yellow, .right);
-        ui.drawNumber(global.getPlayerMagicStrength(role), 4, global.palXY(240, 92), .yellow, .right);
-        ui.drawNumber(global.getPlayerDefense(role), 4, global.palXY(240, 110), .yellow, .right);
-        ui.drawNumber(global.getPlayerDexterity(role), 4, global.palXY(240, 128), .yellow, .right);
-        ui.drawNumber(global.getPlayerFleeRate(role), 4, global.palXY(240, 146), .yellow, .right);
+        ui.drawNumber(global.gpg.g.player_roles.max_hp[role], 4, global.palXY(261, 16 + 18 + 4), .blue, .right);
+        ui.drawNumber(global.gpg.g.player_roles.hp[role], 4, global.palXY(240, 16 + 18 + 1), .yellow, .right);
+        ui.drawNumber(global.gpg.g.player_roles.max_mp[role], 4, global.palXY(261, 16 + 18 * 2 + 4), .blue, .right);
+        ui.drawNumber(global.gpg.g.player_roles.mp[role], 4, global.palXY(240, 16 + 18 * 2 + 1), .yellow, .right);
+        ui.drawNumber(global.getPlayerAttackStrength(role), 4, global.palXY(240, 16 + 18 * 3 + 4), .yellow, .right);
+        ui.drawNumber(global.getPlayerMagicStrength(role), 4, global.palXY(240, 16 + 18 * 4 + 4), .yellow, .right);
+        ui.drawNumber(global.getPlayerDefense(role), 4, global.palXY(240, 16 + 18 * 5 + 4), .yellow, .right);
+        ui.drawNumber(global.getPlayerDexterity(role), 4, global.palXY(240, 16 + 18 * 6 + 4), .yellow, .right);
+        ui.drawNumber(global.getPlayerFleeRate(role), 4, global.palXY(240, 16 + 18 * 7 + 4), .yellow, .right);
 
         var i: u32 = 0;
         while (i <= global.gpg.max_party_member_index) : (i += 1) {
@@ -443,8 +446,10 @@ pub fn itemUseMenu(item_to_use: u16) u16 {
             );
         }
 
+        // 魔改 — item box shifts down 20px so it doesn't collide with 4 names.
+        const item_box_y: i16 = 80 + 20;
         if (palcommon.spriteGetFrame(ui.sprite_ui, SPRITENUM_ITEMBOX)) |bmp| {
-            _ = palcommon.rleBlitToSurface(bmp, &video.screen, global.palXY(120, 80));
+            _ = palcommon.rleBlitToSurface(bmp, &video.screen, global.palXY(120, item_box_y));
         }
 
         const amount = global.getItemAmount(item_to_use);
@@ -453,11 +458,11 @@ pub fn itemUseMenu(item_to_use: u16) u16 {
                 const bitmap = global.gpg.g.objects[item_to_use].item().bitmap;
                 const bmp = ball.getChunkData(bitmap) catch null;
                 if (bmp) |b| {
-                    _ = palcommon.rleBlitToSurface(b, &video.screen, global.palXY(127, 88));
+                    _ = palcommon.rleBlitToSurface(b, &video.screen, global.palXY(127, item_box_y + 8));
                 }
             }
-            text.drawText(text.getWord(item_to_use), global.palXY(116, 143), STATUS_COLOR_EQUIPMENT, true, false);
-            ui.drawNumber(amount, 2, global.palXY(170, 133), .cyan, .right);
+            text.drawText(text.getWord(item_to_use), global.palXY(116, item_box_y + 63), STATUS_COLOR_EQUIPMENT, true, false);
+            ui.drawNumber(amount, 2, global.palXY(170, item_box_y + 53), .cyan, .right);
         }
 
         video.updateScreen(null);

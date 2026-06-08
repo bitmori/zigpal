@@ -27,8 +27,9 @@ const yj1 = @import("yj1.zig");
 // --- Constants ---
 
 pub const MAX_BATTLE_MAGICSPRITE_ITEMS: u32 = 3;
+// 魔改 — fork bumps capacity by 1 for 4-person party.
 pub const MAX_BATTLESPRITESEQ_ITEMS: u32 =
-    global.MAX_ENEMIES_IN_TEAM + global.MAX_PLAYABLE_PLAYER_ROLES + MAX_BATTLE_MAGICSPRITE_ITEMS;
+    global.MAX_ENEMIES_IN_TEAM + global.MAX_PLAYABLE_PLAYER_ROLES + MAX_BATTLE_MAGICSPRITE_ITEMS + 1;
 
 pub const MAX_BATTLE_ACTIONS: u32 = 256;
 pub const MAX_KILLED_ENEMIES: u32 = 256;
@@ -240,10 +241,12 @@ pub const Battle = struct {
 pub var g_battle: Battle = .{};
 
 // Default player positions per party size — copied from battle.c g_rgPlayerPos.
-const PLAYER_POS: [3][3][2]u16 = .{
-    .{ .{ 240, 170 }, .{ 0, 0 }, .{ 0, 0 } }, // one player
-    .{ .{ 200, 176 }, .{ 256, 152 }, .{ 0, 0 } }, // two players
-    .{ .{ 180, 180 }, .{ 234, 170 }, .{ 270, 146 } }, // three players
+// 魔改 — fork extends to 4×4 for 4-person party.
+const PLAYER_POS: [4][4][2]u16 = .{
+    .{ .{ 240, 170 }, .{ 0, 0 }, .{ 0, 0 }, .{ 0, 0 } }, // one player
+    .{ .{ 200, 176 }, .{ 256, 152 }, .{ 0, 0 }, .{ 0, 0 } }, // two players
+    .{ .{ 180, 180 }, .{ 234, 170 }, .{ 270, 146 }, .{ 0, 0 } }, // three players
+    .{ .{ 160, 180 }, .{ 217, 175 }, .{ 255, 155 }, .{ 285, 135 } }, // four players
 };
 
 pub const PLAYER_POS_PUB = PLAYER_POS;

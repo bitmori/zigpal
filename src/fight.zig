@@ -1398,7 +1398,8 @@ pub fn playerPerformAction(player_index: u16) void {
             const wMagicNum = global.gpg.g.objects[wObject].magic().magic_number;
             const sTarget0 = detectMagicTargetChange(@intCast(wMagicNum), p.action.target);
 
-            const rgwCoopPos = [3][2]i32{ .{ 208, 157 }, .{ 234, 170 }, .{ 260, 183 } };
+            // 魔改 — extra slot for the 4th coop contributor.
+            const rgwCoopPos = [4][2]i32{ .{ 208, 157 }, .{ 234, 170 }, .{ 260, 183 }, .{ 286, 196 } };
 
             if (global.gpg.g.magics[wMagicNum].magic_type == global.MAGIC_TYPE_SUMMON) {
                 battleShowPlayerPreMagicAnim(player_index, true);
@@ -2132,6 +2133,11 @@ pub fn playerEscape() void {
                     dy = 4;
                 },
                 2 => {
+                    dx = 6;
+                    dy = 3;
+                },
+                // 魔改 — 4th party slot mirrors slot 2's drift.
+                3 => {
                     dx = 6;
                     dy = 3;
                 },

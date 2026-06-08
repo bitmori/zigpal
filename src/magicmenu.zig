@@ -317,7 +317,8 @@ pub fn magicSelectionMenu(player_role: u16, in_battle: bool, default_magic: u16)
         if (util.shouldQuit()) return 0;
         scene.makeScene();
 
-        var x: i32 = 45;
+        // 魔改 — 4p: start at x=10 so four boxes fit.
+        var x: i32 = if (global.gpg.max_party_member_index >= 3) @as(i32, 10) else @as(i32, 45);
         var i: u32 = 0;
         while (i <= global.gpg.max_party_member_index) : (i += 1) {
             uibattle.playerInfoBox(global.palXY(@intCast(x), 165), global.gpg.party[i].player_role);
@@ -352,7 +353,7 @@ pub fn inGameMagicMenu() void {
         w = 0;
     } else {
         // Draw player info boxes.
-        var y: i32 = 45;
+        var y: i32 = if (global.gpg.max_party_member_index >= 3) @as(i32, 10) else @as(i32, 45);
         var i: u32 = 0;
         while (i <= global.gpg.max_party_member_index) : (i += 1) {
             uibattle.playerInfoBox(global.palXY(@intCast(y), 165), global.gpg.party[i].player_role);
@@ -426,7 +427,9 @@ pub fn inGameMagicMenu() void {
                 video.restoreScreen();
 
                 if (palcommon.spriteGetFrame(ui.sprite_ui, SPRITENUM_CURSOR_UP)) |bmp| {
-                    _ = palcommon.rleBlitToSurface(bmp, &video.screen, global.palXY(@intCast(75 + 78 * @as(i32, w_player)), 158));
+                    // 魔改 — 4p: shift cursor left by 35 to match the narrower info box start.
+                    const cursor_x_off: i32 = if (global.gpg.max_party_member_index >= 3) 35 else 0;
+                    _ = palcommon.rleBlitToSurface(bmp, &video.screen, global.palXY(@intCast(75 + 78 * @as(i32, w_player) - cursor_x_off), 158));
                 }
                 video.updateScreen(null);
 
@@ -476,7 +479,7 @@ pub fn inGameMagicMenu() void {
         }
 
         // Redraw player info boxes after magic.
-        var y: i32 = 45;
+        var y: i32 = if (global.gpg.max_party_member_index >= 3) @as(i32, 10) else @as(i32, 45);
         var i: u32 = 0;
         while (i <= global.gpg.max_party_member_index) : (i += 1) {
             uibattle.playerInfoBox(global.palXY(@intCast(y), 165), global.gpg.party[i].player_role);

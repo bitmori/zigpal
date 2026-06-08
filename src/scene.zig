@@ -325,7 +325,7 @@ pub fn updatePartyGestures(walking: bool) void {
     var step_frame_follower: i32 = 0;
     var step_frame_leader: i32 = 0;
 
-    if (walking) {
+    if (walking and global.gpg.max_party_member_index < 3) {
         s_this_step_frame = @mod(s_this_step_frame + 1, 4);
         if ((s_this_step_frame & 1) != 0) {
             step_frame_leader = @divTrunc(s_this_step_frame + 1, 2);
@@ -377,6 +377,59 @@ pub fn updatePartyGestures(walking: bool) void {
             global.gpg.party[idx].x = @as(i16, @bitCast(global.gpg.trail[2 + f].x)) - global.palX(global.gpg.viewport);
             global.gpg.party[idx].y = @as(i16, @bitCast(global.gpg.trail[2 + f].y)) - global.palY(global.gpg.viewport);
             global.gpg.party[idx].frame = @intCast(@as(i32, global.gpg.trail[2 + f].direction) * 3 + step_frame_follower);
+        }
+    } else if (walking and global.gpg.max_party_member_index >= 3) {
+        // 魔改 — 4-person party gesture update. Each follower uses its own
+        // trail slot (i-1) and applies an offset based on trail[i-1].direction.
+        s_this_step_frame = @mod(s_this_step_frame + 1, 4);
+        if ((s_this_step_frame & 1) != 0) {
+            step_frame_leader = @divTrunc(s_this_step_frame + 1, 2);
+            step_frame_follower = 3 - step_frame_leader;
+        } else {
+            step_frame_leader = 0;
+            step_frame_follower = 0;
+        }
+
+        global.gpg.party[0].x = global.palX(global.gpg.party_offset);
+        global.gpg.party[0].y = global.palY(global.gpg.party_offset);
+
+        if (global.gpg.g.player_roles.walk_frames[global.gpg.party[0].player_role] == 4) {
+            global.gpg.party[0].frame = @intCast(@as(i32, global.gpg.party_direction) * 4 + s_this_step_frame);
+        } else {
+            global.gpg.party[0].frame = @intCast(@as(i32, global.gpg.party_direction) * 3 + step_frame_leader);
+        }
+
+        var i: usize = 1;
+        while (i <= global.gpg.max_party_member_index) : (i += 1) {
+            const trail_idx = i - 1;
+            global.gpg.party[i].x = @as(i16, @bitCast(global.gpg.trail[trail_idx].x)) - global.palX(global.gpg.viewport);
+            global.gpg.party[i].y = @as(i16, @bitCast(global.gpg.trail[trail_idx].y)) - global.palY(global.gpg.viewport);
+
+            // Offset: west(1)/south(0) → x+16; else x-16.
+            //         west(1)/north(2) → y+8; else y-8.
+            const dir = global.gpg.trail[trail_idx].direction;
+            global.gpg.party[i].x += if (dir == 1 or dir == 0) @as(i16, 16) else @as(i16, -16);
+            global.gpg.party[i].y += if (dir == 1 or dir == 2) @as(i16, 8) else @as(i16, -8);
+
+            const px = @as(i32, global.gpg.party[i].x) + global.palX(global.gpg.viewport);
+            const py = @as(i32, global.gpg.party[i].y) + global.palY(global.gpg.viewport);
+            if (checkObstacleWithRange(global.palXY(@truncate(px), @truncate(py)), true, 0, true)) {
+                global.gpg.party[i].x = @as(i16, @bitCast(global.gpg.trail[trail_idx].x)) - global.palX(global.gpg.viewport);
+                global.gpg.party[i].y = @as(i16, @bitCast(global.gpg.trail[trail_idx].y)) - global.palY(global.gpg.viewport);
+            }
+
+            if (global.gpg.g.player_roles.walk_frames[global.gpg.party[i].player_role] == 4) {
+                global.gpg.party[i].frame = @intCast(@as(i32, global.gpg.trail[trail_idx].direction) * 4 + s_this_step_frame);
+            } else {
+                global.gpg.party[i].frame = @intCast(@as(i32, global.gpg.trail[trail_idx].direction) * 3 + step_frame_leader);
+            }
+        }
+
+        if (global.gpg.n_follower > 0) {
+            const follow_trail = global.gpg.max_party_member_index + 1;
+            global.gpg.party[follow_trail].x = @as(i16, @bitCast(global.gpg.trail[follow_trail].x)) - global.palX(global.gpg.viewport);
+            global.gpg.party[follow_trail].y = @as(i16, @bitCast(global.gpg.trail[follow_trail].y)) - global.palY(global.gpg.viewport);
+            global.gpg.party[follow_trail].frame = @intCast(@as(i32, global.gpg.trail[follow_trail].direction) * 3 + step_frame_follower);
         }
     } else {
         var f0: i32 = global.gpg.g.player_roles.walk_frames[global.gpg.party[0].player_role];

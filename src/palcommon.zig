@@ -72,7 +72,8 @@ pub const Surface = struct {
 
 // --- Constants ---
 
-pub const MAX_PLAYERS_IN_PARTY = 3;
+// 魔改 — 4-person party support (fork bumps from 3 to 4).
+pub const MAX_PLAYERS_IN_PARTY = 4;
 pub const MAX_PLAYER_ROLES = 6;
 pub const MAX_PLAYABLE_PLAYER_ROLES = 5;
 pub const MAX_INVENTORY = 256;

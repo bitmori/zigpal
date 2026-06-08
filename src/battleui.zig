@@ -184,7 +184,9 @@ fn drawPlayerInfoBoxes() void {
     var i: u32 = 0;
     while (i <= global.gpg.max_party_member_index) : (i += 1) {
         const role = global.gpg.party[i].player_role;
-        uibattle.playerInfoBox(global.palXY(@intCast(91 + 77 * @as(i32, @intCast(i))), 165), role);
+        // 魔改 — 4p: boxes start at x=14 to fit four side-by-side.
+        const base_x: i32 = if (global.gpg.max_party_member_index >= 3) 14 else 91;
+        uibattle.playerInfoBox(global.palXY(@intCast(base_x + 77 * @as(i32, @intCast(i))), 165), role);
     }
 }
 
@@ -229,11 +231,13 @@ fn drawSelectedPlayerArrow(idx: u32) void {
 
 // Draw the four bottom-row action icons — one highlighted, others mono.
 fn drawActionIcons() void {
+    // 魔改 — when 4 players the info boxes are taller; shift icons up by 37.
+    const y_off: i16 = if (global.gpg.max_party_member_index >= 3) 37 else 0;
     const items = [_]struct { sprite: i32, pos: u32, action: u16 }{
-        .{ .sprite = SPR_BATTLEICON_ATTACK, .pos = global.palXY(27, 140), .action = 0 },
-        .{ .sprite = SPR_BATTLEICON_MAGIC, .pos = global.palXY(0, 155), .action = 1 },
-        .{ .sprite = SPR_BATTLEICON_COOPMAGIC, .pos = global.palXY(54, 155), .action = 2 },
-        .{ .sprite = SPR_BATTLEICON_MISCMENU, .pos = global.palXY(27, 170), .action = 3 },
+        .{ .sprite = SPR_BATTLEICON_ATTACK, .pos = global.palXY(27, 140 - y_off), .action = 0 },
+        .{ .sprite = SPR_BATTLEICON_MAGIC, .pos = global.palXY(0, 155 - y_off), .action = 1 },
+        .{ .sprite = SPR_BATTLEICON_COOPMAGIC, .pos = global.palXY(54, 155 - y_off), .action = 2 },
+        .{ .sprite = SPR_BATTLEICON_MISCMENU, .pos = global.palXY(27, 170 - y_off), .action = 3 },
     };
 
     if (battle.g_battle.ui.menu_state == .main) {
