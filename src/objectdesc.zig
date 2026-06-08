@@ -117,7 +117,7 @@ fn ensureFont() void {
 
 // Decode one UTF-8 codepoint at `text[i]`. Returns (codepoint, bytes_consumed).
 // Malformed sequences are surfaced as '?' so a corrupt byte never aborts a draw.
-fn decodeUtf8(text: []const u8, i: usize) struct { cp: u32, n: usize } {
+pub fn decodeUtf8(text: []const u8, i: usize) struct { cp: u32, n: usize } {
     const n = std.unicode.utf8ByteSequenceLength(text[i]) catch return .{ .cp = '?', .n = 1 };
     if (i + n > text.len) return .{ .cp = '?', .n = 1 };
     const cp = std.unicode.utf8Decode(text[i .. i + n]) catch return .{ .cp = '?', .n = n };
@@ -126,6 +126,13 @@ fn decodeUtf8(text: []const u8, i: usize) struct { cp: u32, n: usize } {
 
 // Render a multi-line UTF-8 string with zpix at (x, y), 12px line height.
 // `\n` advances to the next line. Returns the y after the last line.
+pub fn drawSingleCodepoint(cp: u32, x: i32, y: i32, color: u8) void {
+    ensureFont();
+    const f = if (font) |*p| p else return;
+    _ = f.drawCodepoint(cp, &video.screen, x + 1, y + 1, 0);
+    _ = f.drawCodepoint(cp, &video.screen, x, y, color);
+}
+
 pub fn drawAt(text: []const u8, x: i32, y: i32, color: u8) i32 {
     ensureFont();
     const f = if (font) |*p| p else return y;

@@ -3006,6 +3006,9 @@ pub fn battleWon() void {
     const SPRITENUM_SLASH: i32 = 39;
     const BATTLEWIN_LEVELUP_LABEL_COLOR: u8 = 0xBB;
 
+    // Play victory music (RIX track 3, non-looping, no fade).
+    @import("audio.zig").playMusic(3, false, 0);
+
     // PLAYERROLES OrigPlayerRoles = gpGlobals->g.PlayerRoles;
     var orig_player_roles = global.gpg.g.player_roles;
 
