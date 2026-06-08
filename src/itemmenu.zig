@@ -60,6 +60,7 @@ const EQUIP_STATUS_VALUES = [_]palcommon.Pos{
 var g_num_inventory: i32 = 0;
 var g_item_flags: u16 = 0;
 var g_no_desc: bool = false;
+var g_force_selectable: bool = false;
 
 // PAL_ItemSelectMenuInit.
 pub fn itemSelectMenuInit(item_flags: u16) void {
@@ -161,7 +162,7 @@ pub fn itemSelectMenuUpdate() u16 {
 
             const flags = global.gpg.g.objects[w_object].item().flags;
             const inv = global.gpg.inventory[idx];
-            const usable = (flags & g_item_flags) != 0 and
+            const usable = (g_force_selectable or (flags & g_item_flags) != 0) and
                 @as(i16, @bitCast(inv.amount)) > @as(i16, @bitCast(inv.amount_in_use));
 
             if (i == global.gpg.cur_inv_menu_item) {
@@ -235,12 +236,14 @@ pub fn itemSelectMenuUpdate() u16 {
         }
     }
 
-    // Debug overlay: hex ID at the bottom-left of the item picture (the picture
-    // box is at (0, 140), 32×32 — so just below it).
+    // Debug overlay: object fields.
     if (@import("debug.zig").enabled) {
-        var hex_buf: [16]u8 = undefined;
-        const s = std.fmt.bufPrint(&hex_buf, "{X}", .{w_object_sel}) catch return 0xFFFF;
-        _ = @import("objectdesc.zig").drawAt(s, 2, 174, 0xFF);
+        const d = global.gpg.g.objects[w_object_sel].data;
+        var dbg_buf: [128]u8 = undefined;
+        const s = std.fmt.bufPrint(&dbg_buf, "#{X}=[\xe5\x9b\xbe\xe7\x89\x87={X} \xe4\xbb\xb7\xe6\xa0\xbc={X} \xe4\xbd\xbf\xe7\x94\xa8={X} \xe8\xa3\x85\xe5\xa4\x87={X} \xe6\x8a\x95\xe6\x8e\xb7={X} \xe6\x97\x97={X}]", .{
+            w_object_sel, d[0], d[1], d[2], d[3], d[4], d[5],
+        }) catch return 0xFFFF;
+        _ = @import("objectdesc.zig").drawAt(s, 10, 174, 0x0B);
     }
 
     // Item-description rendering via wScriptDesc is for Win95 builds only,
@@ -248,7 +251,7 @@ pub fn itemSelectMenuUpdate() u16 {
     if ((k_press & input.KEY_SEARCH) != 0) {
         const inv = global.gpg.inventory[@intCast(global.gpg.cur_inv_menu_item)];
         const flags = global.gpg.g.objects[w_object_sel].item().flags;
-        if ((flags & g_item_flags) != 0 and
+        if ((g_force_selectable or (flags & g_item_flags) != 0) and
             @as(i16, @bitCast(inv.amount)) > @as(i16, @bitCast(inv.amount_in_use)))
         {
             if (inv.amount > 0) {
@@ -289,6 +292,7 @@ pub fn itemSelectMenuFromList(item_ids: []const u16) u16 {
     defer {
         global.gpg.inventory = saved_inventory;
         global.gpg.cur_inv_menu_item = saved_cur;
+        g_force_selectable = false;
     }
 
     @memset(&global.gpg.inventory, .{ .item = 0, .amount = 0, .amount_in_use = 0 });
@@ -305,8 +309,12 @@ pub fn itemSelectMenuFromList(item_ids: []const u16) u16 {
     // (object.flags & g_item_flags) != 0 — so as long as the item itself
     // has any flag set (all real items do), it'll pass.
     g_item_flags = 0xFFFF;
+    g_force_selectable = true;
     g_num_inventory = @intCast(n);
-    if (g_num_inventory == 0) return 0;
+    if (g_num_inventory == 0) {
+        g_force_selectable = false;
+        return 0;
+    }
     global.gpg.cur_inv_menu_item = 0;
 
     input.clearKeyState();

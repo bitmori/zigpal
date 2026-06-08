@@ -32,7 +32,8 @@ const MagicItem = struct {
     enabled: bool,
 };
 
-var rg_magic_item: [global.MAX_PLAYER_MAGICS]MagicItem = undefined;
+const MAX_MAGIC_MENU_ITEMS = 128;
+var rg_magic_item: [MAX_MAGIC_MENU_ITEMS]MagicItem = undefined;
 var g_num_magic: i32 = 0;
 var g_current_item: i32 = 0;
 var g_player_mp: u16 = 0;
@@ -210,11 +211,15 @@ pub fn magicSelectionMenuUpdate() u16 {
         }
     }
 
-    // Debug overlay: hex ID at the top-left.
+    // Debug overlay: object fields.
     if (g_num_magic > 0 and @import("debug.zig").enabled) {
-        var hex_buf: [16]u8 = undefined;
-        const s = std.fmt.bufPrint(&hex_buf, "{X}", .{rg_magic_item[@intCast(g_current_item)].magic}) catch return 0xFFFF;
-        _ = @import("objectdesc.zig").drawAt(s, 2, 2, 0xFF);
+        const oid = rg_magic_item[@intCast(g_current_item)].magic;
+        const d = global.gpg.g.objects[oid].data;
+        var buf: [128]u8 = undefined;
+        const s = std.fmt.bufPrint(&buf, "#{X}=[\xe8\xa8\xad\xe5\xae\x9a={X} \xe5\xbe\x8c\xe7\xba\x8c={X} \xe5\x89\x8d\xe5\xba\x8f={X} \xe6\x97\x97={X}]", .{
+            oid, d[0], d[2], d[3], d[5],
+        }) catch return 0xFFFF;
+        _ = @import("objectdesc.zig").drawAt(s, 10, 148, 0x0B);
     }
 
     if ((k_press & input.KEY_SEARCH) != 0) {
@@ -254,7 +259,7 @@ pub fn magicSelectionMenuFromList(magic_ids: []const u16) u16 {
     g_player_mp = 9999;
 
     var i: usize = 0;
-    while (i < magic_ids.len and g_num_magic < global.MAX_PLAYER_MAGICS) : (i += 1) {
+    while (i < magic_ids.len and g_num_magic < MAX_MAGIC_MENU_ITEMS) : (i += 1) {
         const w = magic_ids[i];
         if (w == 0) continue;
         const magic_num = global.gpg.g.objects[w].magic().magic_number;
