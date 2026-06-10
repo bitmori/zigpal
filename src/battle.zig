@@ -216,10 +216,12 @@ pub const Battle = struct {
 
     magic_bitmap: ?[]const u8 = null,
 
-    // 魔改 — set by the magic anim functions when Magic.render_mode requests
-    // a horizontally-mirrored effect; read by drawMagicSprite to dispatch the
-    // mirrored RLE blit. Cleared along with magic_bitmap at end of anim.
+    // 魔改 — set by the magic anim functions from Magic.render_mode.
+    // Cleared along with magic_bitmap at end of anim.
     magic_render_mirror: bool = false,
+    // 魔改 — render_mode 高字节: 非零时启用 MonoColor 渲染。
+    // 值直接作为 base_color (高4位=色系行, 低4位=亮度偏移量, 带符号).
+    magic_mono_color: u8 = 0,
 
     sprite_draw_seq: [MAX_BATTLESPRITESEQ_ITEMS]BattleSpriteSeq = [_]BattleSpriteSeq{.{}} ** MAX_BATTLESPRITESEQ_ITEMS,
     max_sprite_draw_seq_index: u16 = 0,
@@ -630,8 +632,13 @@ fn drawMagicSprite(seq: BattleSpriteSeq, dst: *palcommon.Surface) void {
         @truncate(@as(i32, global.palX(seq.pos)) - @divTrunc(w, 2)),
         @truncate(@as(i32, global.palY(seq.pos)) - h),
     );
-    if (g_battle.magic_render_mirror) {
+    if (g_battle.magic_render_mirror and g_battle.magic_mono_color != 0) {
+        std.log.warn("mirror + mono_color combo not implemented", .{});
         _ = palcommon.rleBlitToSurfaceInMirror(bmp, dst, top_left);
+    } else if (g_battle.magic_render_mirror) {
+        _ = palcommon.rleBlitToSurfaceInMirror(bmp, dst, top_left);
+    } else if (g_battle.magic_mono_color != 0) {
+        _ = palcommon.rleBlitMonoColor(bmp, dst, top_left, g_battle.magic_mono_color, 0);
     } else {
         _ = palcommon.rleBlitToSurface(bmp, dst, top_left);
     }

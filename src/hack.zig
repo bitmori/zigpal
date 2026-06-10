@@ -4,11 +4,11 @@
 //! `name` (UTF-8, rendered with zpix BDF), an optional `desc` (UTF-8 multiline,
 //! shown on the right pane), and a `code` array of DSL lines.
 //!
-//! DSL is whitespace-tokenised, one statement per line. MVP supports a single
-//! command:
+//! DSL is whitespace-tokenised, one statement per line:
 //!
 //!   ADD_CASH <int>                          # add to gpg.cash, clamped to u32
 //!   CHANGE_MAGIC_DATA <id> <off> <val>      # poke Magic[id] field at u16 offset
+//!   CHANGE_OBJ <obj_id> <off> <val>         # poke Object[obj_id].data[off]
 //!   EDIT_SCRIPT <entry> <op> <a1> <a2> <a3> # rewrite script_entries[entry]
 //!
 //! The selection UI mirrors magic_menu.magicSelectionMenuUpdate so the hack
@@ -61,9 +61,6 @@ fn loadFromDisk() void {
     arena_state = std.heap.ArenaAllocator.init(global.allocator);
     const arena = arena_state.?.allocator();
 
-    // Parse as a generic JSON value first, then transcribe into our struct
-    // so we keep arena ownership of every byte. std.json.parseFromSlice into
-    // []Hack would need a different lifetime for the source bytes.
     const parsed = std.json.parseFromSlice(std.json.Value, arena, buf, .{}) catch |err| {
         std.log.err("hack: parse failed: {}", .{err});
         return;
@@ -144,128 +141,179 @@ fn parseI64(tok: []const u8) ?i64 {
     return std.fmt.parseInt(i64, tok, 0) catch null;
 }
 
+// --- Command implementations ---
+
+fn cmdAddCash(rest: *[]const u8) void {
+    const v_tok = nextToken(rest) orelse {
+        logErr("ADD_CASH needs an integer argument", .{});
+        return;
+    };
+    const v = parseI64(v_tok) orelse {
+        logErr("ADD_CASH: bad integer '{s}'", .{v_tok});
+        return;
+    };
+    const cur: i64 = @intCast(global.gpg.cash);
+    const new = cur + v;
+    global.gpg.cash = if (new < 0) 0 else if (new > 0xFFFFFFFF) 0xFFFFFFFF else @intCast(new);
+}
+
+fn cmdChangeMagicData(rest: *[]const u8) void {
+    const id_tok = nextToken(rest) orelse {
+        logErr("CHANGE_MAGIC_DATA needs <id> <offset> <value>", .{});
+        return;
+    };
+    const off_tok = nextToken(rest) orelse {
+        logErr("CHANGE_MAGIC_DATA needs <id> <offset> <value>", .{});
+        return;
+    };
+    const val_tok = nextToken(rest) orelse {
+        logErr("CHANGE_MAGIC_DATA needs <id> <offset> <value>", .{});
+        return;
+    };
+    const id = parseI64(id_tok) orelse {
+        logErr("CHANGE_MAGIC_DATA: bad id '{s}'", .{id_tok});
+        return;
+    };
+    const off = parseI64(off_tok) orelse {
+        logErr("CHANGE_MAGIC_DATA: bad offset '{s}'", .{off_tok});
+        return;
+    };
+    const val = parseI64(val_tok) orelse {
+        logErr("CHANGE_MAGIC_DATA: bad value '{s}'", .{val_tok});
+        return;
+    };
+    const n_magics: i64 = @intCast(global.gpg.g.magics.len);
+    if (id < 0 or id >= n_magics) {
+        logErr("CHANGE_MAGIC_DATA: id {} out of range [0,{})", .{ id, n_magics });
+        return;
+    }
+    const n_fields: usize = @sizeOf(global.Magic) / 2;
+    if (off < 0 or off >= n_fields) {
+        logErr("CHANGE_MAGIC_DATA: offset {} out of range [0,{})", .{ off, n_fields });
+        return;
+    }
+    if (val < std.math.minInt(i16) or val > std.math.maxInt(u16)) {
+        logErr("CHANGE_MAGIC_DATA: value {} doesn't fit in 16 bits", .{val});
+        return;
+    }
+    const raw: *align(1) [n_fields]u16 = @ptrCast(&global.gpg.g.magics[@intCast(id)]);
+    raw[@intCast(off)] = @truncate(@as(u64, @bitCast(val)));
+}
+
+fn cmdChangeObj(rest: *[]const u8) void {
+    const oid_tok = nextToken(rest) orelse {
+        logErr("CHANGE_OBJ needs <obj_id> <offset> <value>", .{});
+        return;
+    };
+    const off_tok = nextToken(rest) orelse {
+        logErr("CHANGE_OBJ needs <obj_id> <offset> <value>", .{});
+        return;
+    };
+    const val_tok = nextToken(rest) orelse {
+        logErr("CHANGE_OBJ needs <obj_id> <offset> <value>", .{});
+        return;
+    };
+    const oid = parseI64(oid_tok) orelse {
+        logErr("CHANGE_OBJ: bad obj_id '{s}'", .{oid_tok});
+        return;
+    };
+    const off = parseI64(off_tok) orelse {
+        logErr("CHANGE_OBJ: bad offset '{s}'", .{off_tok});
+        return;
+    };
+    const val = parseI64(val_tok) orelse {
+        logErr("CHANGE_OBJ: bad value '{s}'", .{val_tok});
+        return;
+    };
+    if (oid < 0 or oid >= global.MAX_OBJECTS) {
+        logErr("CHANGE_OBJ: obj_id {} out of range [0,{})", .{ oid, global.MAX_OBJECTS });
+        return;
+    }
+    if (off < 0 or off >= 6) {
+        logErr("CHANGE_OBJ: offset {} out of range [0,6)", .{off});
+        return;
+    }
+    if (val < std.math.minInt(i16) or val > std.math.maxInt(u16)) {
+        logErr("CHANGE_OBJ: value {} doesn't fit in 16 bits", .{val});
+        return;
+    }
+    global.gpg.g.objects[@intCast(oid)].data[@intCast(off)] = @truncate(@as(u64, @bitCast(val)));
+}
+
+fn cmdEditScript(rest: *[]const u8) void {
+    const entry_tok = nextToken(rest) orelse {
+        logErr("EDIT_SCRIPT needs <entry> <op> <a1> <a2> <a3>", .{});
+        return;
+    };
+    const op_tok = nextToken(rest) orelse {
+        logErr("EDIT_SCRIPT needs <entry> <op> <a1> <a2> <a3>", .{});
+        return;
+    };
+    const a1_tok = nextToken(rest) orelse {
+        logErr("EDIT_SCRIPT needs <entry> <op> <a1> <a2> <a3>", .{});
+        return;
+    };
+    const a2_tok = nextToken(rest) orelse {
+        logErr("EDIT_SCRIPT needs <entry> <op> <a1> <a2> <a3>", .{});
+        return;
+    };
+    const a3_tok = nextToken(rest) orelse {
+        logErr("EDIT_SCRIPT needs <entry> <op> <a1> <a2> <a3>", .{});
+        return;
+    };
+    const entry = parseI64(entry_tok) orelse {
+        logErr("EDIT_SCRIPT: bad entry '{s}'", .{entry_tok});
+        return;
+    };
+    const op = parseI64(op_tok) orelse {
+        logErr("EDIT_SCRIPT: bad op '{s}'", .{op_tok});
+        return;
+    };
+    const a1 = parseI64(a1_tok) orelse {
+        logErr("EDIT_SCRIPT: bad arg1 '{s}'", .{a1_tok});
+        return;
+    };
+    const a2 = parseI64(a2_tok) orelse {
+        logErr("EDIT_SCRIPT: bad arg2 '{s}'", .{a2_tok});
+        return;
+    };
+    const a3 = parseI64(a3_tok) orelse {
+        logErr("EDIT_SCRIPT: bad arg3 '{s}'", .{a3_tok});
+        return;
+    };
+    const n_entries: i64 = @intCast(global.gpg.g.script_entries.len);
+    if (entry < 0 or entry >= n_entries) {
+        logErr("EDIT_SCRIPT: entry {} out of range [0,{})", .{ entry, n_entries });
+        return;
+    }
+    const raws = [_]i64{ op, a1, a2, a3 };
+    for (raws) |w| {
+        if (w < std.math.minInt(i16) or w > std.math.maxInt(u16)) {
+            logErr("EDIT_SCRIPT: word {} doesn't fit in 16 bits", .{w});
+            return;
+        }
+    }
+    const e = &global.gpg.g.script_entries[@intCast(entry)];
+    e.operation = @truncate(@as(u64, @bitCast(op)));
+    e.operand[0] = @truncate(@as(u64, @bitCast(a1)));
+    e.operand[1] = @truncate(@as(u64, @bitCast(a2)));
+    e.operand[2] = @truncate(@as(u64, @bitCast(a3)));
+}
+
+// --- Dispatcher ---
+
 fn execLine(line: []const u8) void {
     var rest = line;
     const cmd = nextToken(&rest) orelse return;
 
     if (std.mem.eql(u8, cmd, "ADD_CASH")) {
-        const v_tok = nextToken(&rest) orelse {
-            logErr("ADD_CASH needs an integer argument", .{});
-            return;
-        };
-        const v = parseI64(v_tok) orelse {
-            logErr("ADD_CASH: bad integer '{s}'", .{v_tok});
-            return;
-        };
-        const cur: i64 = @intCast(global.gpg.cash);
-        const new = cur + v;
-        const clamped: u32 = if (new < 0) 0 else if (new > 0xFFFFFFFF) 0xFFFFFFFF else @intCast(new);
-        global.gpg.cash = clamped;
+        cmdAddCash(&rest);
     } else if (std.mem.eql(u8, cmd, "CHANGE_MAGIC_DATA")) {
-        // Magic is 16 u16/i16 fields packed align(1) — treat it as [N]u16 and
-        // poke by index. Caller writes the raw word (i16 fields take two's
-        // complement bit pattern).
-        const id_tok = nextToken(&rest) orelse {
-            logErr("CHANGE_MAGIC_DATA needs <id> <offset> <value>", .{});
-            return;
-        };
-        const off_tok = nextToken(&rest) orelse {
-            logErr("CHANGE_MAGIC_DATA needs <id> <offset> <value>", .{});
-            return;
-        };
-        const val_tok = nextToken(&rest) orelse {
-            logErr("CHANGE_MAGIC_DATA needs <id> <offset> <value>", .{});
-            return;
-        };
-        const id = parseI64(id_tok) orelse {
-            logErr("CHANGE_MAGIC_DATA: bad id '{s}'", .{id_tok});
-            return;
-        };
-        const off = parseI64(off_tok) orelse {
-            logErr("CHANGE_MAGIC_DATA: bad offset '{s}'", .{off_tok});
-            return;
-        };
-        const val = parseI64(val_tok) orelse {
-            logErr("CHANGE_MAGIC_DATA: bad value '{s}'", .{val_tok});
-            return;
-        };
-        const n_magics: i64 = @intCast(global.gpg.g.magics.len);
-        if (id < 0 or id >= n_magics) {
-            logErr("CHANGE_MAGIC_DATA: id {} out of range [0,{})", .{ id, n_magics });
-            return;
-        }
-        const n_fields: usize = @sizeOf(global.Magic) / 2;
-        if (off < 0 or off >= n_fields) {
-            logErr("CHANGE_MAGIC_DATA: offset {} out of range [0,{})", .{ off, n_fields });
-            return;
-        }
-        if (val < std.math.minInt(i16) or val > std.math.maxInt(u16)) {
-            logErr("CHANGE_MAGIC_DATA: value {} doesn't fit in 16 bits", .{val});
-            return;
-        }
-        // Magic is align(1); cast through an align(1) array view.
-        const raw: *align(1) [n_fields]u16 = @ptrCast(&global.gpg.g.magics[@intCast(id)]);
-        raw[@intCast(off)] = @truncate(@as(u64, @bitCast(val)));
+        cmdChangeMagicData(&rest);
+    } else if (std.mem.eql(u8, cmd, "CHANGE_OBJ")) {
+        cmdChangeObj(&rest);
     } else if (std.mem.eql(u8, cmd, "EDIT_SCRIPT")) {
-        // ScriptEntry = { op: u16, operand: [3]u16 }. Overwrite all four
-        // words of the entry at the given index.
-        const entry_tok = nextToken(&rest) orelse {
-            logErr("EDIT_SCRIPT needs <entry> <op> <a1> <a2> <a3>", .{});
-            return;
-        };
-        const op_tok = nextToken(&rest) orelse {
-            logErr("EDIT_SCRIPT needs <entry> <op> <a1> <a2> <a3>", .{});
-            return;
-        };
-        const a1_tok = nextToken(&rest) orelse {
-            logErr("EDIT_SCRIPT needs <entry> <op> <a1> <a2> <a3>", .{});
-            return;
-        };
-        const a2_tok = nextToken(&rest) orelse {
-            logErr("EDIT_SCRIPT needs <entry> <op> <a1> <a2> <a3>", .{});
-            return;
-        };
-        const a3_tok = nextToken(&rest) orelse {
-            logErr("EDIT_SCRIPT needs <entry> <op> <a1> <a2> <a3>", .{});
-            return;
-        };
-        const entry = parseI64(entry_tok) orelse {
-            logErr("EDIT_SCRIPT: bad entry '{s}'", .{entry_tok});
-            return;
-        };
-        const op = parseI64(op_tok) orelse {
-            logErr("EDIT_SCRIPT: bad op '{s}'", .{op_tok});
-            return;
-        };
-        const a1 = parseI64(a1_tok) orelse {
-            logErr("EDIT_SCRIPT: bad arg1 '{s}'", .{a1_tok});
-            return;
-        };
-        const a2 = parseI64(a2_tok) orelse {
-            logErr("EDIT_SCRIPT: bad arg2 '{s}'", .{a2_tok});
-            return;
-        };
-        const a3 = parseI64(a3_tok) orelse {
-            logErr("EDIT_SCRIPT: bad arg3 '{s}'", .{a3_tok});
-            return;
-        };
-        const n_entries: i64 = @intCast(global.gpg.g.script_entries.len);
-        if (entry < 0 or entry >= n_entries) {
-            logErr("EDIT_SCRIPT: entry {} out of range [0,{})", .{ entry, n_entries });
-            return;
-        }
-        const raws = [_]i64{ op, a1, a2, a3 };
-        for (raws) |w| {
-            if (w < std.math.minInt(i16) or w > std.math.maxInt(u16)) {
-                logErr("EDIT_SCRIPT: word {} doesn't fit in 16 bits", .{w});
-                return;
-            }
-        }
-        const e = &global.gpg.g.script_entries[@intCast(entry)];
-        e.operation = @truncate(@as(u64, @bitCast(op)));
-        e.operand[0] = @truncate(@as(u64, @bitCast(a1)));
-        e.operand[1] = @truncate(@as(u64, @bitCast(a2)));
-        e.operand[2] = @truncate(@as(u64, @bitCast(a3)));
+        cmdEditScript(&rest);
     } else {
         logErr("unknown command: '{s}'", .{cmd});
     }
@@ -330,8 +378,7 @@ pub fn updateOnce() i32 {
     text.drawText(text.getWord(CASH_LABEL), global.palXY(10, 10), 0, false, false);
     ui.drawNumber(global.gpg.cash, 6, global.palXY(49, 14), .yellow, .right);
 
-    // Grid of hack names. Use the magic menu's paging maths (start so the
-    // current item is roughly mid-page).
+    // Grid of hack names.
     const page_offset: i32 = @divTrunc(LINES_PER_PAGE, 2);
     var i: i32 = @divTrunc(g_current, ITEMS_PER_LINE) * ITEMS_PER_LINE - ITEMS_PER_LINE * page_offset;
     if (i < 0) i = 0;
@@ -359,8 +406,7 @@ pub fn updateOnce() i32 {
         }
     }
 
-    // Description in the same spot magicmenu uses (magicmenu.zig:209) —
-    // top-centre area, just left of the cash box on the right.
+    // Description panel.
     if (n > 0) {
         const desc = hacks[@intCast(g_current)].desc;
         if (desc.len > 0) {
@@ -375,20 +421,12 @@ pub fn updateOnce() i32 {
 }
 
 /// Top-level: open the hack menu, block until the user picks or cancels,
-/// and run the chosen hack's code. Caller is responsible for backup/restore
-/// of the framebuffer.
+/// and run the chosen hack's code.
 pub fn runMenu() void {
     loadFromDisk();
-    if (hacks.len == 0) {
-        // Nothing to show.
-        return;
-    }
+    if (hacks.len == 0) return;
     g_current = 0;
 
-    // Snapshot the framebuffer once so each frame can restore it before
-    // redrawing — otherwise the BDF text overlays on top of the previous
-    // frame's text and the description area smears. magicmenu does the
-    // same thing via scene.makeScene + restoreScreen (magicmenu.zig:392).
     video.backupScreen();
     defer {
         video.restoreScreen();
@@ -401,7 +439,6 @@ pub fn runMenu() void {
     while (true) {
         if (util.shouldQuit()) return;
 
-        // Wipe to the saved background each frame.
         video.restoreScreen();
 
         const r = updateOnce();

@@ -2189,6 +2189,7 @@ pub fn battleShowPlayerOffMagicAnim(player_index: u16, object_id: u16, sTarget: 
     const mirror: bool = (render_mode & (global.MAGIC_RENDER_MIRROR | global.MAGIC_RENDER_MIRROR_HERO_OFF)) != 0;
     const triple_parallel: bool = (render_mode & global.MAGIC_RENDER_TRIPLE_PARALLEL) != 0;
     battle.g_battle.magic_render_mirror = mirror;
+    battle.g_battle.magic_mono_color = @truncate(render_mode >> 8);
 
     // PAL_MKFGetDecompressedSize → if <= 0, return.
     const decomp_size = fire.getDecompressedSize(iEffectNum, false) catch return;
@@ -2269,6 +2270,8 @@ pub fn battleShowPlayerOffMagicAnim(player_index: u16, object_id: u16, sTarget: 
             if (util.shouldQuit()) {
                 battle.g_battle.magic_bitmap = null;
                 battle.g_battle.magic_render_mirror = false;
+    battle.g_battle.magic_mono_color = 0;
+                battle.g_battle.magic_mono_color = 0;
                 return;
             }
         }
@@ -2334,6 +2337,7 @@ pub fn battleShowPlayerOffMagicAnim(player_index: u16, object_id: u16, sTarget: 
     video.shakeScreen(0, 0);
     battle.g_battle.magic_bitmap = null;
     battle.g_battle.magic_render_mirror = false;
+    battle.g_battle.magic_mono_color = 0;
 
     var k: u32 = 0;
     while (battle.g_battle.max_enemy_index >= 0 and k <= @as(u32, @intCast(battle.g_battle.max_enemy_index))) : (k += 1) {
@@ -2372,6 +2376,8 @@ pub fn battleShowEnemyMagicAnim(enemy_index: u16, object_id: u16, sTarget: i32) 
     const reverse: bool = (render_mode & (global.MAGIC_RENDER_REVERSE | global.MAGIC_RENDER_REVERSE_ENEMY_OFF)) != 0;
     const mirror: bool = (render_mode & (global.MAGIC_RENDER_MIRROR | global.MAGIC_RENDER_MIRROR_ENEMY_OFF)) != 0;
     battle.g_battle.magic_render_mirror = mirror;
+    battle.g_battle.magic_mono_color = @truncate(render_mode >> 8);
+
 
     const decomp_size = fire.getDecompressedSize(iEffectNum, false) catch return;
     if (decomp_size == 0) return;
@@ -2455,6 +2461,8 @@ pub fn battleShowEnemyMagicAnim(enemy_index: u16, object_id: u16, sTarget: i32) 
             if (util.shouldQuit()) {
                 battle.g_battle.magic_bitmap = null;
                 battle.g_battle.magic_render_mirror = false;
+    battle.g_battle.magic_mono_color = 0;
+                battle.g_battle.magic_mono_color = 0;
                 return;
             }
         }
@@ -2507,6 +2515,7 @@ pub fn battleShowEnemyMagicAnim(enemy_index: u16, object_id: u16, sTarget: i32) 
     video.shakeScreen(0, 0);
     battle.g_battle.magic_bitmap = null;
     battle.g_battle.magic_render_mirror = false;
+    battle.g_battle.magic_mono_color = 0;
 
     var k: u32 = 0;
     while (k <= global.gpg.max_party_member_index) : (k += 1) {
@@ -2542,6 +2551,8 @@ pub fn battleShowPlayerDefMagicAnim(player_index: u16, object_id: u16, sTarget: 
     // honoured for defensive magic (the visual sits on the friendly target).
     const render_mode: u16 = global.gpg.g.magics[iMagicNum].render_mode;
     const reverse: bool = (render_mode & (global.MAGIC_RENDER_REVERSE | global.MAGIC_RENDER_REVERSE_HERO_OFF)) != 0;
+    battle.g_battle.magic_mono_color = @truncate(render_mode >> 8);
+
 
     var dw_time: u32 = util.getTicks() + frame_ms;
     var i: i32 = 0;
