@@ -401,8 +401,9 @@ pub fn itemSelectMenu(on_change: ui.ItemChangedCallback, item_flags: u16) u16 {
 }
 
 // PAL_ItemUseMenu — choose which player gets to use the item.
+var s_selected_player: i16 = 0;
 pub fn itemUseMenu(item_to_use: u16) u16 {
-    var selected_player: i16 = 0;
+    var selected_player = s_selected_player;
 
     while (true) {
         if (util.shouldQuit()) return ui.MENUITEM_VALUE_CANCELLED;
@@ -495,6 +496,7 @@ pub fn itemUseMenu(item_to_use: u16) u16 {
         } else if ((k & input.KEY_MENU) != 0) {
             return ui.MENUITEM_VALUE_CANCELLED;
         } else if ((k & input.KEY_SEARCH) != 0) {
+            s_selected_player = selected_player;
             return global.gpg.party[@intCast(selected_player)].player_role;
         }
     }

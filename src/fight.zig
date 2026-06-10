@@ -129,7 +129,14 @@ fn calcMagicDamage(
             s_damage /= 10.0;
         }
     }
-    return @intFromFloat(s_damage);
+    const result: i32 = @intFromFloat(s_damage);
+    if (@import("debug.zig").enabled) {
+        std.log.info("MAGIC_DMG obj={X} mag#{} str={} def={} base_dmg={} elem={} result={}", .{
+            magic_object_id, magic_id, magic_strength_in, defense,
+            global.gpg.g.magics[magic_id].base_damage, elem, result,
+        });
+    }
+    return result;
 }
 
 // FIGHT_DetectMagicTargetChange — fight.c L3551. Force sTarget to 0 / -1
@@ -2357,7 +2364,12 @@ fn blitMagicResidueToBackground(sprite_effect: []const u8, frame_idx: i32, x: i3
     };
     const w: i32 = palcommon.rleGetWidth(b);
     const h: i32 = palcommon.rleGetHeight(b);
-    _ = palcommon.rleBlitToSurface(b, &bg_surface, global.palXY(@truncate(x - @divTrunc(w, 2)), @truncate(y - h)));
+    const pos = global.palXY(@truncate(x - @divTrunc(w, 2)), @truncate(y - h));
+    if (battle.g_battle.magic_render_mirror) {
+        _ = palcommon.rleBlitToSurfaceInMirror(b, &bg_surface, pos);
+    } else {
+        _ = palcommon.rleBlitToSurface(b, &bg_surface, pos);
+    }
 }
 
 // PAL_BattleShowEnemyMagicAnim — fight.c L2846. Same shape as the player

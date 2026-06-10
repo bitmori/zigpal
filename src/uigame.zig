@@ -13,6 +13,7 @@ const global = @import("global.zig");
 const palcommon = @import("palcommon.zig");
 const video = @import("video.zig");
 const ui = @import("ui.zig");
+const text = @import("text.zig");
 
 // Word numbers from ui.h.
 pub const MAINMENU_LABEL_NEWGAME: u16 = 7;
@@ -113,7 +114,6 @@ pub fn confirmMenu() bool {
 pub fn amountSelect(max: u32) u32 {
     const input = @import("input.zig");
     const util = @import("util.zig");
-    const text = @import("text.zig");
     if (max == 0) return 0;
 
     const max_i: i32 = @intCast(max);
@@ -226,6 +226,7 @@ pub fn quitGame() void {
         @import("libretro_core.zig").quit_flag.store(true, .monotonic);
     }
 }
+
 
 // PAL_SystemMenu — save/load/music/sound/quit. Returns true if the user actually
 // did something (save/load/quit), false if cancelled.
