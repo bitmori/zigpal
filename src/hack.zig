@@ -323,6 +323,55 @@ pub fn runCode(code: []const []const u8) void {
     for (code) |line| execLine(line);
 }
 
+// --- Auto-hacks: run once after every save/new-game load ---
+
+var auto_hacks_loaded: bool = false;
+var auto_hacks_code: [][]const u8 = &.{};
+
+pub fn runAutoHacks() void {
+    if (!auto_hacks_loaded) {
+        auto_hacks_loaded = true;
+        loadAutoHacks();
+    }
+    for (auto_hacks_code) |line| execLine(line);
+}
+
+fn loadAutoHacks() void {
+    const sys_dir = @import("libretro_core.zig").system_dir orelse return;
+    var path_buf: [4096]u8 = undefined;
+    const path = std.fmt.bufPrint(&path_buf, "{s}/pal/auto_hacks.json\x00", .{sys_dir}) catch return;
+    const path_z: [*:0]const u8 = path_buf[0 .. path.len - 1 :0];
+    const buf = util.readFileFully(path_z, global.allocator) orelse return;
+    defer global.allocator.free(buf);
+
+    if (arena_state == null) {
+        arena_state = std.heap.ArenaAllocator.init(global.allocator);
+    }
+    const arena = arena_state.?.allocator();
+
+    const parsed = std.json.parseFromSlice(std.json.Value, arena, buf, .{}) catch |err| {
+        std.log.err("auto_hacks: parse failed: {}", .{err});
+        return;
+    };
+
+    if (parsed.value != .array) {
+        std.log.err("auto_hacks: top-level JSON must be an array of strings", .{});
+        return;
+    }
+
+    const items = parsed.value.array.items;
+    var lines = arena.alloc([]const u8, items.len) catch return;
+    var n: usize = 0;
+    for (items) |item| {
+        if (item == .string) {
+            lines[n] = item.string;
+            n += 1;
+        }
+    }
+    auto_hacks_code = lines[0..n];
+    std.log.info("auto_hacks: loaded {d} commands", .{n});
+}
+
 // --- Menu UI (mirrors magicmenu.magicSelectionMenuUpdate) ---------------
 
 const ITEMS_PER_LINE: i32 = 3;

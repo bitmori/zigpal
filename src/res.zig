@@ -69,6 +69,7 @@ pub fn loadResources() !void {
     // Load global data
     if ((global.gpg.load_flags & global.LOAD_GLOBAL_DATA) != 0) {
         try initGameData(global.gpg.current_save_slot);
+        @import("hack.zig").runAutoHacks();
         // Mirror SDLPAL res.c:223 — every reload (new game / load save / scene
         // change requesting LOAD_GLOBAL_DATA) restarts the current BGM. This is
         // how zigpal's many num_music writers (script ops 0x0043/0x00A3, save
