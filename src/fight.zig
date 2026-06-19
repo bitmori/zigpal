@@ -782,13 +782,147 @@ fn allActionsSelected() void {
 // Validate the action target before perform — Stage 7c just relies on the
 // commit-time target. PAL_CLASSIC reroutes a few illegal cases (target
 // dead, magic with no MP, etc); we'll grow this as needed.
+// PAL_BattlePlayerValidateAction — fight.c L3249. Full port.
 fn validateAction(player_index: u16) void {
     const p = &battle.g_battle.players[player_index];
-    if (p.action.action_type == .attack and p.action.target >= 0) {
+    const role = global.gpg.party[player_index].player_role;
+    const object_id = p.action.action_id;
+    var f_to_enemy = false;
+
+    switch (p.action.action_type) {
+        .attack => {
+            f_to_enemy = true;
+        },
+        .pass, .defend => {},
+        .magic => {
+            var f_valid = true;
+
+            // Player must actually have this magic.
+            var has_magic = false;
+            var mi: u32 = 0;
+            while (mi < global.MAX_PLAYER_MAGICS) : (mi += 1) {
+                if (global.gpg.g.player_roles.magic[mi][role] == object_id) {
+                    has_magic = true;
+                    break;
+                }
+            }
+            if (!has_magic) f_valid = false;
+
+            const magic_num = global.gpg.g.objects[object_id].magic().magic_number;
+
+            // Silenced.
+            if (global.gpg.player_status[role][global.STATUS_SILENCE] > 0) f_valid = false;
+
+            // Insufficient MP.
+            if (global.gpg.g.player_roles.mp[role] < global.gpg.g.magics[magic_num].cost_mp) f_valid = false;
+
+            const flags = global.gpg.g.objects[object_id].magic().flags;
+            if ((flags & global.MAGIC_FLAG_USABLE_TO_ENEMY) != 0) {
+                if (!f_valid) {
+                    p.action.action_type = .attack;
+                    p.action.action_id = 0;
+                } else if ((flags & global.MAGIC_FLAG_APPLY_TO_ALL) != 0) {
+                    p.action.target = -1;
+                } else if (p.action.target == -1) {
+                    p.action.target = @intCast(battleSelectAutoTargetFrom(p.action.target));
+                }
+                f_to_enemy = true;
+            } else {
+                if (!f_valid) {
+                    p.action.action_type = .defend;
+                } else if ((flags & global.MAGIC_FLAG_APPLY_TO_ALL) != 0) {
+                    p.action.target = -1;
+                } else if (p.action.target == -1) {
+                    p.action.target = @intCast(player_index);
+                }
+            }
+        },
+        .coop_magic => {
+            f_to_enemy = true;
+            // PAL_CLASSIC path: need ≥2 healthy contributors.
+            var healthy: u32 = 0;
+            var ci: u32 = 0;
+            while (ci <= global.gpg.max_party_member_index) : (ci += 1) {
+                const w = global.gpg.party[ci].player_role;
+                battle.g_battle.coop_contributors[ci] = if (isPlayerHealthy(w)) 1 else 0;
+                if (battle.g_battle.coop_contributors[ci] != 0) healthy += 1;
+            }
+            if (healthy <= 1) {
+                p.action.action_type = .attack;
+                p.action.action_id = 0;
+            }
+            if (p.action.action_type == .coop_magic) {
+                const flags = global.gpg.g.objects[object_id].magic().flags;
+                if ((flags & global.MAGIC_FLAG_APPLY_TO_ALL) != 0) {
+                    p.action.target = -1;
+                } else if (p.action.target == -1) {
+                    p.action.target = @intCast(battleSelectAutoTargetFrom(p.action.target));
+                }
+            }
+        },
+        .flee => {},
+        .throw_item => {
+            f_to_enemy = true;
+            if (global.getItemAmount(object_id) == 0) {
+                p.action.action_type = .attack;
+                p.action.action_id = 0;
+            } else if ((global.gpg.g.objects[object_id].item().flags & global.ITEM_FLAG_APPLY_TO_ALL) != 0) {
+                p.action.target = -1;
+            } else if (p.action.target == -1) {
+                p.action.target = @intCast(battleSelectAutoTargetFrom(p.action.target));
+            }
+        },
+        .use_item => {
+            if (global.getItemAmount(object_id) == 0) {
+                p.action.action_type = .defend;
+            } else if ((global.gpg.g.objects[object_id].item().flags & global.ITEM_FLAG_APPLY_TO_ALL) != 0) {
+                p.action.target = -1;
+            } else if (p.action.target == -1) {
+                p.action.target = @intCast(player_index);
+            }
+        },
+        .attack_mate => {
+            if (global.gpg.player_status[role][global.STATUS_CONFUSED] == 0) {
+                // Not confused — attack enemies instead.
+                f_to_enemy = true;
+                p.action.action_type = .attack;
+                p.action.action_id = 0;
+            } else {
+                // Find another alive party member to attack.
+                var found_mate = false;
+                var ai: u32 = 0;
+                while (ai <= global.gpg.max_party_member_index) : (ai += 1) {
+                    if (ai != player_index and
+                        global.gpg.g.player_roles.hp[global.gpg.party[ai].player_role] != 0)
+                    {
+                        found_mate = true;
+                        break;
+                    }
+                }
+                if (!found_mate) {
+                    p.action.action_type = .pass;
+                    p.action.action_id = 0;
+                }
+            }
+        },
+    }
+
+    // Attack: check attack-all capability.
+    if (p.action.action_type == .attack) {
+        if (p.action.target == -1) {
+            if (!global.playerCanAttackAll(role)) {
+                p.action.target = @intCast(battleSelectAutoTargetFrom(p.action.target));
+            }
+        } else if (global.playerCanAttackAll(role)) {
+            p.action.target = -1;
+        }
+    }
+
+    // Redirect dead/invalid enemy target.
+    if (f_to_enemy and p.action.target >= 0) {
         const t: usize = @intCast(p.action.target);
-        if (battle.g_battle.enemies[t].object_id == 0 or @as(i16, @bitCast(battle.g_battle.enemies[t].e.health)) <= 0) {
-            const auto = battleSelectAutoTarget();
-            p.action.target = if (auto < 0) -1 else @intCast(auto);
+        if (battle.g_battle.enemies[t].object_id == 0 or battle.g_battle.enemies[t].e.health == 0) {
+            p.action.target = @intCast(battleSelectAutoTargetFrom(p.action.target));
         }
     }
 }
