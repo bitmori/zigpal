@@ -405,7 +405,8 @@ pub fn postActionCheck(fCheckPlayers: bool) void {
     }
 
     // fCheckPlayers branch (fight.c L775-886): friend-death + dying scripts.
-    if (fCheckPlayers) blk: {
+    // SDLPAL skips this when auto_battle is active.
+    if (fCheckPlayers and !global.gpg.auto_battle) blk: {
         // Friend-death pass.
         var pi: u32 = 0;
         while (pi <= global.gpg.max_party_member_index) : (pi += 1) {
