@@ -103,6 +103,7 @@ const Voice = struct {
 
 const SfxRequest = struct {
     num: i32 = -1,
+    stop_all: bool = false,
 };
 
 var g_voices: [MAX_VOICES]Voice = [_]Voice{.{}} ** MAX_VOICES;
@@ -175,10 +176,13 @@ pub fn stopMusic(fade_seconds: f32) void {
 /// pops it next produce(). Negative numbers are treated as their absolute
 /// value (matches SDLPAL convention where flags ride in the sign bit).
 pub fn playSound(num: i32) void {
-    if (num == 0) return;
-    const sfx = if (num < 0) -num else num;
     const idx = g_sfx_tail % SFX_QUEUE;
-    g_sfx_queue[idx] = .{ .num = sfx };
+    if (num == 0) {
+        g_sfx_queue[idx] = .{ .num = 0, .stop_all = true };
+    } else {
+        const sfx = if (num < 0) -num else num;
+        g_sfx_queue[idx] = .{ .num = sfx };
+    }
     g_sfx_tail +%= 1;
 }
 
@@ -188,6 +192,11 @@ fn drainSfxQueue() void {
     while (g_sfx_head != g_sfx_tail) {
         const req = g_sfx_queue[g_sfx_head % SFX_QUEUE];
         g_sfx_head +%= 1;
+        if (req.stop_all) {
+            for (&g_voices) |*v| v.active = false;
+            g_last_sfx = 0;
+            continue;
+        }
         if (req.num <= 0) continue;
         startVoice(req.num);
     }

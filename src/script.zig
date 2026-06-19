@@ -2050,6 +2050,7 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
         },
         0x009E => {
             // Enemy summons another monster.
+            @import("audio.zig").playSound(212);
             const battle_mod = @import("battle.zig");
             const fight_mod = @import("fight.zig");
             const e = &battle_mod.g_battle.enemies[event_object_id];

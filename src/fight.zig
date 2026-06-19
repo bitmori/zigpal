@@ -401,6 +401,7 @@ pub fn postActionCheck(fCheckPlayers: bool) void {
     if (!fEnemyRemaining) {
         battle.g_battle.enemy_cleared = true;
         battle.g_battle.ui.state = .wait;
+        @import("audio.zig").playSound(0);
     }
 
     // fCheckPlayers branch (fight.c L775-886): friend-death + dying scripts.
@@ -1412,6 +1413,7 @@ pub fn playerPerformAction(player_index: u16) void {
                 battleShowPlayerPreMagicAnim(player_index, true);
                 battleShowPlayerSummonMagicAnim(0xFFFF, wObject);
             } else {
+                @import("audio.zig").playSound(29);
                 // Gather: 6 frames lerp every contributor toward rgwCoopPos.
                 var i: i32 = 1;
                 while (i <= 6) : (i += 1) {
@@ -2868,6 +2870,7 @@ pub fn battleShowPostMagicAnim() void {
 
 // PAL_BattleEnemyEscape — slide all enemies off-screen leftward.
 pub fn enemyEscape() void {
+    @import("audio.zig").playSound(45);
     var moved = true;
     while (moved) {
         moved = false;
@@ -3031,8 +3034,8 @@ pub fn battleWon() void {
     const SPRITENUM_SLASH: i32 = 39;
     const BATTLEWIN_LEVELUP_LABEL_COLOR: u8 = 0xBB;
 
-    // Play victory music (RIX track 3, non-looping, no fade).
-    @import("audio.zig").playMusic(3, false, 0);
+    // Play victory music (boss=2, normal=3), non-looping. SDLPAL battle.c:1032.
+    @import("audio.zig").playMusic(if (battle.g_battle.is_boss) @as(i32, 2) else @as(i32, 3), false, 0);
 
     // PLAYERROLES OrigPlayerRoles = gpGlobals->g.PlayerRoles;
     var orig_player_roles = global.gpg.g.player_roles;

@@ -810,8 +810,6 @@ pub fn battleMakeScene() void {
 
 // PAL_StartBattle — entry point.
 pub fn startBattle(enemy_team: u16, is_boss: bool) BattleResult {
-    const palette = @import("palette.zig");
-
     const prev_wave_level = global.gpg.screen_wave;
     const prev_wave_progression = global.gpg.wave_progression;
 
@@ -826,11 +824,6 @@ pub fn startBattle(enemy_team: u16, is_boss: bool) BattleResult {
     @import("audio.zig").stopMusic(1.0);
     util.delay(200);
     @import("audio.zig").playMusic(@intCast(global.gpg.num_battle_music), true, 0);
-
-    if (global.gpg.need_to_fade_in) {
-        palette.fadeIn(@intCast(global.gpg.num_palette), global.gpg.night_palette, 1);
-        global.gpg.need_to_fade_in = false;
-    }
 
     const result = battleMain();
 
