@@ -654,10 +654,13 @@ pub fn runTriggerScript(script_entry_in: u16, event_object_id_in: u16) u16 {
                 w_script_entry +%= 1;
             },
             0x0005 => {
-                // Redraw screen — SDLPAL calls PAL_ClearDialog(TRUE) first so
-                // the user has a chance to read the dialog before it's wiped.
                 text.clearDialog(true);
-                if (!global.gpg.in_battle) {
+                if (global.gpg.in_battle) {
+                    const battle_mod = @import("battle.zig");
+                    battle_mod.battleMakeScene();
+                    @memcpy(&video.screen_pixels, &battle_mod.g_battle.scene_buf_pixels);
+                    video.updateScreen(null);
+                } else {
                     if (p_script.operand[2] != 0) scene_mod.updatePartyGestures(false);
                     scene_mod.makeScene();
                     video.updateScreen(null);
@@ -868,11 +871,11 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
             // Equip the selected item.
             const part: usize = @as(usize, p_script.operand[0]) - 0x0B;
             g_cur_equip_part = @intCast(part);
-            // Remove existing equipment effect — Stage 6 will run wScriptOnEquip.
-            // (We model only the inventory swap here.)
             if (part <= global.MAX_PLAYER_EQUIPMENTS) {
                 const equipped = global.gpg.g.player_roles.equipment[part][event_object_id];
                 if (equipped != p_script.operand[1]) {
+                    // Clear old equipment effect before swapping. SDLPAL script.c:778.
+                    global.removeEquipmentEffect(event_object_id, @intCast(part));
                     global.gpg.g.player_roles.equipment[part][event_object_id] = p_script.operand[1];
                     _ = global.addItemToInventory(p_script.operand[1], -1);
                     if (equipped != 0) _ = global.addItemToInventory(equipped, 1);
@@ -1003,6 +1006,7 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
                 while (i < global.MAX_PLAYER_EQUIPMENTS) : (i += 1) {
                     const w = global.gpg.g.player_roles.equipment[i][i_player_role];
                     if (w != 0) {
+                        global.removeEquipmentEffect(i_player_role, @intCast(i));
                         _ = global.addItemToInventory(w, 1);
                         global.gpg.g.player_roles.equipment[i][i_player_role] = 0;
                     }
@@ -1011,6 +1015,7 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
                 const part = p_script.operand[1] - 1;
                 const w = global.gpg.g.player_roles.equipment[part][i_player_role];
                 if (w != 0) {
+                    global.removeEquipmentEffect(i_player_role, @intCast(part));
                     _ = global.addItemToInventory(w, 1);
                     global.gpg.g.player_roles.equipment[part][i_player_role] = 0;
                 }
@@ -1374,9 +1379,11 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
             g_script_success = false;
         },
         0x0043 => {
-            // Set background music.
+            // Set background music. operand[1]: 1=no-loop, 3=slow-fade (3s).
             global.gpg.num_music = p_script.operand[0];
-            @import("audio.zig").playMusic(p_script.operand[0], true, 1.0);
+            const loop_43 = p_script.operand[1] != 1;
+            const fade_43: f32 = if (p_script.operand[1] == 3 and p_script.operand[0] != 9) 3.0 else 0.0;
+            @import("audio.zig").playMusic(p_script.operand[0], loop_43, fade_43);
         },
         0x0044 => {
             partyRideEventObject(event_object_id, p_script.operand[0], p_script.operand[1], p_script.operand[2], 4);
@@ -1616,6 +1623,9 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
                 global.gpg.max_party_member_index = 1;
             }
             global.gpg.max_party_member_index -= 1;
+            // Clear poison status and recalculate equipment effects. SDLPAL script.c:2195-2196.
+            for (&global.gpg.poison_status) |*row| @memset(row, .{ .poison_id = 0, .poison_script = 0 });
+            global.updateEquipments();
             global.setLoadFlags(global.LOAD_PLAYER_SPRITE);
             res.loadResources() catch {};
         },
@@ -1623,8 +1633,10 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
             showFbp(p_script.operand[0], p_script.operand[1]);
         },
         0x0077 => {
+            // Stop music. operand[0]==0 → 2s fade, else operand[0]*3s.
+            const fade_77: f32 = if (p_script.operand[0] == 0) 2.0 else @as(f32, @floatFromInt(p_script.operand[0])) * 3.0;
+            @import("audio.zig").stopMusic(fade_77);
             global.gpg.num_music = 0;
-            @import("audio.zig").stopMusic(2.0);
         },
         0x0078 => {
             // unknown.
@@ -2133,6 +2145,7 @@ fn interpretInstruction(script_entry_in: u16, event_object_id: u16) u16 {
                     fight_mod.battleDelay(1, 0, false);
                 }
                 e.color_shift = 0;
+                @import("audio.zig").playSound(47);
 
                 video.backupScreen();
                 battle_mod.loadBattleSprites();
