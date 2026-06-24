@@ -205,6 +205,12 @@ fn partyRideEventObject(event_object_id: u16, x: u16, y: u16, h: u16, speed: i32
         x_offset = @as(i32, x) * 32 + @as(i32, h) * 16 - global.palX(global.gpg.viewport) - global.palX(global.gpg.party_offset);
         y_offset = @as(i32, y) * 16 + @as(i32, h) * 8 - global.palY(global.gpg.viewport) - global.palY(global.gpg.party_offset);
     }
+
+    // zigpal poll-mode: held direction persists across ride frames. Clear it
+    // so the party doesn't auto-walk on dismount. SDLPAL doesn't need this
+    // because its event-driven input naturally resets dir on key-up.
+    input.clearKeyState();
+    input.forgetDirection();
 }
 
 // PAL_MonsterChasePlayer — script.c L310. Move an event-object monster

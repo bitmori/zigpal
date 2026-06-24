@@ -231,6 +231,8 @@ pub fn startFrame() void {
         search();
     } else if ((k & input.KEY_FLEE) != 0) {
         @import("uigame.zig").quitGame();
+    } else if ((k & input.KEY_AUTO) != 0) {
+        @import("debug.zig").requestMenu();
     }
 
     @import("debug.zig").pollMenuRequest();

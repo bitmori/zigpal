@@ -353,6 +353,9 @@ const MAINMENU_LABEL_NEWGAME_VAL: u16 = MAINMENU_LABEL_NEWGAME;
 // PAL_OpeningMenu — main menu (New Game / Load Game). Returns the save slot
 // to load (1-5), or 0 to start a new game.
 pub fn openingMenu() i32 {
+    // Ensure title music is playing (splash may have been skipped).
+    @import("audio.zig").playMusic(5, true, 0);
+
     const w0 = ui.wordWidth(MAINMENU_LABEL_NEWGAME);
     const w1 = ui.wordWidth(MAINMENU_LABEL_LOADGAME);
 
