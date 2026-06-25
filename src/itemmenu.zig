@@ -236,14 +236,20 @@ pub fn itemSelectMenuUpdate() u16 {
         }
     }
 
-    // Debug overlay: object fields.
+    // Debug overlay: object fields (two lines).
     if (@import("debug.zig").enabled) {
+        const objectdesc = @import("objectdesc.zig");
         const d = global.gpg.g.objects[w_object_sel].data;
-        var dbg_buf: [128]u8 = undefined;
-        const s = std.fmt.bufPrint(&dbg_buf, "#{X}=[\xe5\x9b\xbe\xe7\x89\x87={X} \xe4\xbb\xb7\xe6\xa0\xbc={X} \xe4\xbd\xbf\xe7\x94\xa8={X} \xe8\xa3\x85\xe5\xa4\x87={X} \xe6\x8a\x95\xe6\x8e\xb7={X} \xe6\x97\x97={X}]", .{
-            w_object_sel, d[0], d[1], d[2], d[3], d[4], d[5],
+        var buf1: [80]u8 = undefined;
+        var buf2: [80]u8 = undefined;
+        const s1 = std.fmt.bufPrint(&buf1, "#{X} \xe5\x9b\xbe\xe7\x89\x87={X} \xe4\xbb\xb7\xe6\xa0\xbc={X} \xe6\x97\x97={X}", .{
+            w_object_sel, d[0], d[1], d[5],
         }) catch return 0xFFFF;
-        _ = @import("objectdesc.zig").drawAt(s, 10, 174, 0x0B);
+        const s2 = std.fmt.bufPrint(&buf2, "\xe4\xbd\xbf\xe7\x94\xa8={X} \xe8\xa3\x85\xe5\xa4\x87={X} \xe6\x8a\x95\xe6\x8e\xb7={X}", .{
+            d[2], d[3], d[4],
+        }) catch return 0xFFFF;
+        _ = objectdesc.drawAt(s1, 10, 162, 0x0B);
+        _ = objectdesc.drawAt(s2, 10, 174, 0x0B);
     }
 
     // Item-description rendering via wScriptDesc is for Win95 builds only,

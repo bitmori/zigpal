@@ -17,6 +17,9 @@ const bdf = @import("bdf.zig");
 const res_mod = @import("res.zig");
 const util = @import("util.zig");
 
+pub var show_events: bool = false;
+pub var show_status: bool = false;
+pub var show_grid: bool = false;
 pub var enabled: bool = false;
 var font: ?bdf.BdfFont = null;
 var font_loaded: bool = false;
@@ -76,7 +79,7 @@ const MenuEntry = struct { label: []const u8, action: *const fn () void };
 // Labels are stored as BIG5 byte strings so they can be rendered with
 // SDLPAL's 16x16 built-in font (text.drawText).
 const menu_entries = [_]MenuEntry{
-    .{ .label = "\xb4\x4d\xc2\xdc", .action = actionToggleOverlay }, // 尋蹤
+    .{ .label = "\xb4\x4d\xc2\xdc", .action = actionTraceSubmenu }, // 尋蹤
     .{ .label = "\xae\xf0\xbe\xae", .action = actionOpenPawnShop }, // 氣凝
     .{ .label = "\xc2\xc3\xaf\x75", .action = actionRandomShop }, // 藏真
     .{ .label = "\xaf\xab\xb1\xc2", .action = actionLearnMagic }, // 神授 (匯 not in wor16 font)
@@ -267,9 +270,46 @@ fn pickEnemyTeam() ?u16 {
     return null;
 }
 
-fn actionToggleOverlay() void {
-    enabled = !enabled;
-    if (enabled) ensureFont();
+fn actionTraceSubmenu() void {
+    const ui = @import("ui.zig");
+    const text = @import("text.zig");
+
+    const LABEL_EVENTS = "\xaa\xab\xa5\xf3"; // 物件
+    const LABEL_INFO = "\xb1\xf8\xb3\xf8"; // 情報
+    const LABEL_BORDER = "\xc3\xf8\xac\xf8"; // 邊界
+
+    while (true) {
+        if (@import("util.zig").shouldQuit()) return;
+
+        _ = ui.createBox(global.palXY(100, 50), 2, 4, 0, false);
+
+        const c_ev: u8 = if (show_events) ui.MENUITEM_COLOR_CONFIRMED else ui.MENUITEM_COLOR;
+        const c_st: u8 = if (show_status) ui.MENUITEM_COLOR_CONFIRMED else ui.MENUITEM_COLOR;
+        const c_gr: u8 = if (show_grid) ui.MENUITEM_COLOR_CONFIRMED else ui.MENUITEM_COLOR;
+
+        text.drawText(LABEL_EVENTS, global.palXY(110, 58), c_ev, true, false);
+        text.drawText(LABEL_INFO, global.palXY(110, 76), c_st, true, false);
+        text.drawText(LABEL_BORDER, global.palXY(110, 94), c_gr, true, false);
+
+        var menu_items = [_]ui.MenuItem{
+            .{ .value = 0, .num_word = 0, .enabled = true, .pos = global.palXY(110, 58) },
+            .{ .value = 1, .num_word = 0, .enabled = true, .pos = global.palXY(110, 76) },
+            .{ .value = 2, .num_word = 0, .enabled = true, .pos = global.palXY(110, 94) },
+        };
+
+        video.updateScreen(null);
+        const sel = ui.readMenu(null, &menu_items, 0, ui.MENUITEM_COLOR);
+        if (sel == ui.MENUITEM_VALUE_CANCELLED) break;
+
+        switch (sel) {
+            0 => show_events = !show_events,
+            1 => show_status = !show_status,
+            2 => show_grid = !show_grid,
+            else => {},
+        }
+        enabled = show_events or show_status or show_grid;
+        if (enabled) ensureFont();
+    }
 }
 
 fn actionOpenPawnShop() void {
@@ -623,16 +663,20 @@ fn drawText(text: []const u8, x: i32, y: i32) void {
     _ = f.drawAscii(text, &video.screen, x, y, COLOR_TEXT);
 }
 
-// drawOverlay — invoked at the end of PAL_MakeScene when `enabled` is true.
+// drawOverlay — invoked at the end of PAL_MakeScene.
 pub fn drawOverlay() void {
     if (!enabled) return;
     ensureFont();
 
-    const m = res_mod.getCurrentMap() orelse return;
-    drawTileGrid(m);
-    drawEventObjects();
-    drawPartyMarker();
-    drawStatusLine();
+    if (show_events) {
+        drawEventObjects();
+        drawPartyMarker();
+    }
+    if (show_status) drawStatusLine();
+    if (show_grid) {
+        const m = res_mod.getCurrentMap() orelse return;
+        drawTileGrid(m);
+    }
 }
 
 // Tile coordinates in SDLPAL's map are: 64 x 128, tile 32x16 px, with two
