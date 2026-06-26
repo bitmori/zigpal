@@ -30,6 +30,7 @@ pub fn gameUpdate(trigger: bool) void {
             input.clearKeyState();
             input.forgetDirection();
             scene_mod.makeScene();
+            scene_mod.checkFadeIn();
         }
 
         const scene_idx = @as(usize, global.gpg.num_scene) - 1;
@@ -211,6 +212,7 @@ pub fn startFrame() void {
 
     updateParty();
     scene_mod.makeScene();
+    scene_mod.checkFadeIn();
     video.updateScreen(null);
 
     const k = input.state.key_press;

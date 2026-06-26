@@ -252,7 +252,11 @@ pub fn makeScene() void {
     applyWave();
     sceneDrawSprites();
     @import("debug.zig").drawOverlay();
+}
 
+// Consume need_to_fade_in flag. Called once per frame from startFrame,
+// NOT from inside makeScene (which may run nested inside paletteFade loops).
+pub fn checkFadeIn() void {
     if (global.gpg.need_to_fade_in) {
         video.updateScreen(null);
         palette_mod.fadeIn(@intCast(global.gpg.num_palette), global.gpg.night_palette, 1);
